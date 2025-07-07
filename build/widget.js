@@ -1,12 +1,3 @@
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 import { ModelManager } from './model.js';
 import { showMessage, welcomeMessage } from './message.js';
 import { randomSelection } from './utils.js';
@@ -90,34 +81,32 @@ function registerEventListener(tips) {
             showMessage(tips.message.visibilitychange, 6000, 9);
     });
 }
-function loadWidget(config) {
-    return __awaiter(this, void 0, void 0, function* () {
-        var _b;
-        localStorage.removeItem('waifu-display');
-        sessionStorage.removeItem('waifu-message-priority');
-        document.body.insertAdjacentHTML('beforeend', `<div id="waifu">
+async function loadWidget(config) {
+    var _b;
+    localStorage.removeItem('waifu-display');
+    sessionStorage.removeItem('waifu-message-priority');
+    document.body.insertAdjacentHTML('beforeend', `<div id="waifu">
        <div id="waifu-tips"></div>
        <div id="waifu-canvas">
          <canvas id="live2d" width="800" height="800"></canvas>
        </div>
        <div id="waifu-tool"></div>
      </div>`);
-        let models = [];
-        let tips;
-        if (config.waifuPath) {
-            const response = yield fetch(config.waifuPath);
-            tips = yield response.json();
-            models = tips.models;
-            registerEventListener(tips);
-            showMessage(welcomeMessage(tips.time, tips.message.welcome, tips.message.referrer), 7000, 11);
-        }
-        const model = yield ModelManager.initCheck(config, models);
-        yield model.loadModel('');
-        new ToolsManager(model, config, tips).registerTools();
-        if (config.drag)
-            registerDrag();
-        (_b = document.getElementById('waifu')) === null || _b === void 0 ? void 0 : _b.classList.add('waifu-active');
-    });
+    let models = [];
+    let tips;
+    if (config.waifuPath) {
+        const response = await fetch(config.waifuPath);
+        tips = await response.json();
+        models = tips.models;
+        registerEventListener(tips);
+        showMessage(welcomeMessage(tips.time, tips.message.welcome, tips.message.referrer), 7000, 11);
+    }
+    const model = await ModelManager.initCheck(config, models);
+    await model.loadModel('');
+    new ToolsManager(model, config, tips).registerTools();
+    if (config.drag)
+        registerDrag();
+    (_b = document.getElementById('waifu')) === null || _b === void 0 ? void 0 : _b.classList.add('waifu-active');
 }
 function initWidget(config) {
     if (typeof config === 'string') {

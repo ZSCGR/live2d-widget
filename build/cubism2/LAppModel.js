@@ -1,12 +1,3 @@
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 import { L2DBaseModel, Live2DFramework, L2DEyeBlink } from './Live2DFramework.js';
 import ModelSettingJson from './utils/ModelSettingJson.js';
 import LAppDefine from './LAppDefine.js';
@@ -97,15 +88,13 @@ class LAppModel extends L2DBaseModel {
             }
         });
     }
-    loadModelSetting(modelSettingPath, modelSetting) {
-        return __awaiter(this, void 0, void 0, function* () {
-            this.setUpdating(true);
-            this.setInitialized(false);
-            this.modelHomeDir = modelSettingPath.substring(0, modelSettingPath.lastIndexOf('/') + 1);
-            this.modelSetting = new ModelSettingJson();
-            this.modelSetting.json = modelSetting;
-            yield new Promise(resolve => this.loadJSON(resolve));
-        });
+    async loadModelSetting(modelSettingPath, modelSetting) {
+        this.setUpdating(true);
+        this.setInitialized(false);
+        this.modelHomeDir = modelSettingPath.substring(0, modelSettingPath.lastIndexOf('/') + 1);
+        this.modelSetting = new ModelSettingJson();
+        this.modelSetting.json = modelSetting;
+        await new Promise(resolve => this.loadJSON(resolve));
     }
     load(gl, modelSettingPath, callback) {
         this.setUpdating(true);
