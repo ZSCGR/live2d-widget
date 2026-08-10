@@ -165,11 +165,19 @@ export class AppDelegate extends LAppDelegate {
 
   transformOffset(e) {
     const subdelegate = this._subdelegates.at(0);
-    const rect = subdelegate.getCanvas().getBoundingClientRect();
-    const localX = e.pageX - rect.left;
-    const localY = e.pageY - rect.top;
-    const posX = localX * window.devicePixelRatio;
-    const posY = localY * window.devicePixelRatio;
+    const canvas = subdelegate.getCanvas();
+    const rect = canvas.getBoundingClientRect();
+    // getBoundingClientRect is viewport-relative, so the pointer position has
+    // to be viewport-relative too. pageX/pageY include the scroll offset and
+    // the widget is position: fixed, which made every hit test drift by
+    // exactly scrollX/scrollY once the page was scrolled.
+    const localX = e.clientX - rect.left;
+    const localY = e.clientY - rect.top;
+    // Scale CSS pixels into drawing buffer pixels. This equals the device
+    // pixel ratio while the buffer is sized by resizeCanvas(), and stays
+    // correct if LAppDefine.CanvasSize pins it to a fixed size instead.
+    const posX = localX * (canvas.width / rect.width);
+    const posY = localY * (canvas.height / rect.height);
     const x = subdelegate._view.transformViewX(posX);
     const y = subdelegate._view.transformViewY(posY);
     return {

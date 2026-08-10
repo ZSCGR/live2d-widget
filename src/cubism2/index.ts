@@ -246,28 +246,58 @@ class Cubism2Model {
     }
   }
 
+  /**
+   * Map a pointer position onto the model's view coordinates.
+   *
+   * The drawing buffer (800x800) and the CSS box (300x300 by default) do not
+   * have the same size, so client coordinates have to be scaled into buffer
+   * pixels before deviceToScreen and the view matrix can map them onto the
+   * model. The result matches what is actually rendered, zoom included.
+   */
+  viewPoint(event: MouseEvent | Touch) {
+    if (!this.canvas) return { x: 0, y: 0 };
+    const rect = this.canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return { x: 0, y: 0 };
+
+    const deviceX = (event.clientX - rect.left) * (this.canvas.width / rect.width);
+    const deviceY = (event.clientY - rect.top) * (this.canvas.height / rect.height);
+
+    return {
+      x: this.transformViewX(deviceX),
+      y: this.transformViewY(deviceY),
+    };
+  }
+
   modelTurnHead(event: MouseEvent | Touch) {
     if (!this.canvas || !this.dragMgr) return;
     const rect = this.canvas.getBoundingClientRect();
 
+    // Gaze target: relative to the whole window, so the model can look at
+    // anything on the page.
     const { vx, vy } = normalizePoint(event.clientX, event.clientY, rect.left + rect.width / 2, rect.top + rect.height / 2, window.innerWidth, window.innerHeight);
+    // Hit testing: relative to the canvas, the only frame the model is drawn in.
+    const { x, y } = this.viewPoint(event);
 
     logger.trace(
       'onMouseDown device( x:' +
       event.clientX +
       ' y:' +
       event.clientY +
-      ' ) view( x:' +
+      ' ) gaze( x:' +
       vx +
       ' y:' +
       vy +
+      ' ) view( x:' +
+      x +
+      ' y:' +
+      y +
       ')',
     );
 
     this.dragMgr.setPoint(vx, vy);
-    this.live2DMgr.tapEvent(vx, vy);
+    this.live2DMgr.tapEvent(x, y);
 
-    if (this.live2DMgr.model?.hitTest(LAppDefine.HIT_AREA_BODY, vx, vy)) {
+    if (this.live2DMgr.model?.hitTest(LAppDefine.HIT_AREA_BODY, x, y)) {
       window.dispatchEvent(new Event('live2d:tapbody'));
     }
   }
@@ -277,22 +307,27 @@ class Cubism2Model {
     const rect = this.canvas.getBoundingClientRect();
 
     const { vx, vy } = normalizePoint(event.clientX, event.clientY, rect.left + rect.width / 2, rect.top + rect.height / 2, window.innerWidth, window.innerHeight);
+    const { x, y } = this.viewPoint(event);
 
     logger.trace(
       'onMouseMove device( x:' +
       event.clientX +
       ' y:' +
       event.clientY +
-      ' ) view( x:' +
+      ' ) gaze( x:' +
       vx +
       ' y:' +
       vy +
+      ' ) view( x:' +
+      x +
+      ' y:' +
+      y +
       ')',
     );
 
     this.dragMgr.setPoint(vx, vy);
 
-    if (this.live2DMgr.model?.hitTest(LAppDefine.HIT_AREA_BODY, vx, vy)) {
+    if (this.live2DMgr.model?.hitTest(LAppDefine.HIT_AREA_BODY, x, y)) {
       window.dispatchEvent(new Event('live2d:hoverbody'));
     }
   }
