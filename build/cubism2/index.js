@@ -174,50 +174,73 @@ class Cubism2Model {
             }
         }
     }
+    viewPoint(event) {
+        if (!this.canvas)
+            return { x: 0, y: 0 };
+        const rect = this.canvas.getBoundingClientRect();
+        if (!rect.width || !rect.height)
+            return { x: 0, y: 0 };
+        const deviceX = (event.clientX - rect.left) * (this.canvas.width / rect.width);
+        const deviceY = (event.clientY - rect.top) * (this.canvas.height / rect.height);
+        return {
+            x: this.transformViewX(deviceX),
+            y: this.transformViewY(deviceY),
+        };
+    }
     modelTurnHead(event) {
-        var _b;
+        var _a;
         if (!this.canvas || !this.dragMgr)
             return;
         const rect = this.canvas.getBoundingClientRect();
         const { vx, vy } = normalizePoint(event.clientX, event.clientY, rect.left + rect.width / 2, rect.top + rect.height / 2, window.innerWidth, window.innerHeight);
+        const { x, y } = this.viewPoint(event);
         logger.trace('onMouseDown device( x:' +
             event.clientX +
             ' y:' +
             event.clientY +
-            ' ) view( x:' +
+            ' ) gaze( x:' +
             vx +
             ' y:' +
             vy +
+            ' ) view( x:' +
+            x +
+            ' y:' +
+            y +
             ')');
         this.dragMgr.setPoint(vx, vy);
-        this.live2DMgr.tapEvent(vx, vy);
-        if ((_b = this.live2DMgr.model) === null || _b === void 0 ? void 0 : _b.hitTest(LAppDefine.HIT_AREA_BODY, vx, vy)) {
+        this.live2DMgr.tapEvent(x, y);
+        if ((_a = this.live2DMgr.model) === null || _a === void 0 ? void 0 : _a.hitTest(LAppDefine.HIT_AREA_BODY, x, y)) {
             window.dispatchEvent(new Event('live2d:tapbody'));
         }
     }
     followPointer(event) {
-        var _b;
+        var _a;
         if (!this.canvas || !this.dragMgr)
             return;
         const rect = this.canvas.getBoundingClientRect();
         const { vx, vy } = normalizePoint(event.clientX, event.clientY, rect.left + rect.width / 2, rect.top + rect.height / 2, window.innerWidth, window.innerHeight);
+        const { x, y } = this.viewPoint(event);
         logger.trace('onMouseMove device( x:' +
             event.clientX +
             ' y:' +
             event.clientY +
-            ' ) view( x:' +
+            ' ) gaze( x:' +
             vx +
             ' y:' +
             vy +
+            ' ) view( x:' +
+            x +
+            ' y:' +
+            y +
             ')');
         this.dragMgr.setPoint(vx, vy);
-        if ((_b = this.live2DMgr.model) === null || _b === void 0 ? void 0 : _b.hitTest(LAppDefine.HIT_AREA_BODY, vx, vy)) {
+        if ((_a = this.live2DMgr.model) === null || _a === void 0 ? void 0 : _a.hitTest(LAppDefine.HIT_AREA_BODY, x, y)) {
             window.dispatchEvent(new Event('live2d:hoverbody'));
         }
     }
     lookFront() {
-        var _b;
-        (_b = this.dragMgr) === null || _b === void 0 ? void 0 : _b.setPoint(0, 0);
+        var _a;
+        (_a = this.dragMgr) === null || _a === void 0 ? void 0 : _a.setPoint(0, 0);
     }
     mouseEvent(e) {
         e.preventDefault();
@@ -275,12 +298,12 @@ class Cubism2Model {
         return this.viewMatrix.invertTransformY(screenY);
     }
     transformScreenX(deviceX) {
-        var _b, _c;
-        return (_c = (_b = this.deviceToScreen) === null || _b === void 0 ? void 0 : _b.transformX(deviceX)) !== null && _c !== void 0 ? _c : 0;
+        var _a, _b;
+        return (_b = (_a = this.deviceToScreen) === null || _a === void 0 ? void 0 : _a.transformX(deviceX)) !== null && _b !== void 0 ? _b : 0;
     }
     transformScreenY(deviceY) {
-        var _b, _c;
-        return (_c = (_b = this.deviceToScreen) === null || _b === void 0 ? void 0 : _b.transformY(deviceY)) !== null && _c !== void 0 ? _c : 0;
+        var _a, _b;
+        return (_b = (_a = this.deviceToScreen) === null || _a === void 0 ? void 0 : _a.transformY(deviceY)) !== null && _b !== void 0 ? _b : 0;
     }
 }
 export default Cubism2Model;

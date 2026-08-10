@@ -22,6 +22,10 @@ declare class Cubism2Model {
     changeModel(modelSettingPath: string): Promise<void>;
     changeModelWithJSON(modelSettingPath: string, modelSetting: Live2DModelSetting): Promise<void>;
     modelScaling(scale: number): void;
+    viewPoint(event: MouseEvent | Touch): {
+        x: number;
+        y: number;
+    };
     modelTurnHead(event: MouseEvent | Touch): void;
     followPointer(event: MouseEvent | Touch): void;
     lookFront(): void;

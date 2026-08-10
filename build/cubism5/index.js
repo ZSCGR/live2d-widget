@@ -94,11 +94,12 @@ export class AppDelegate extends LAppDelegate {
     }
     transformOffset(e) {
         const subdelegate = this._subdelegates.at(0);
-        const rect = subdelegate.getCanvas().getBoundingClientRect();
-        const localX = e.pageX - rect.left;
-        const localY = e.pageY - rect.top;
-        const posX = localX * window.devicePixelRatio;
-        const posY = localY * window.devicePixelRatio;
+        const canvas = subdelegate.getCanvas();
+        const rect = canvas.getBoundingClientRect();
+        const localX = e.clientX - rect.left;
+        const localY = e.clientY - rect.top;
+        const posX = localX * (canvas.width / rect.width);
+        const posY = localY * (canvas.height / rect.height);
         const x = subdelegate._view.transformViewX(posX);
         const y = subdelegate._view.transformViewY(posY);
         return {
