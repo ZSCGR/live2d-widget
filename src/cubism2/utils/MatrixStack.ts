@@ -7,6 +7,11 @@
  */
 
 class MatrixStack {
+  private static matrixStack: number[] = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+  private static depth: number = 0;
+  private static currentMatrix: number[] = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+  private static tmp: number[] = new Array(16);
+
   static reset() {
     this.depth = 0;
   }
@@ -45,11 +50,11 @@ class MatrixStack {
     }
   }
 
-  static getMatrix() {
+  static getMatrix(): number[] {
     return this.currentMatrix;
   }
 
-  static multMatrix(matNew) {
+  static multMatrix(matNew: number[]) {
     let i, j, k;
 
     for (i = 0; i < 16; i++) {
@@ -69,13 +74,5 @@ class MatrixStack {
     }
   }
 }
-
-MatrixStack.matrixStack = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
-
-MatrixStack.depth = 0;
-
-MatrixStack.currentMatrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
-
-MatrixStack.tmp = new Array(16);
 
 export default MatrixStack;

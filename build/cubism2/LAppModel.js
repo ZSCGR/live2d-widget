@@ -11,18 +11,21 @@ class LAppModel extends L2DBaseModel {
         this.tmpMatrix = [];
     }
     loadJSON(callback) {
-        const path = this.modelHomeDir + this.modelSetting.getModelFile();
+        const modelSetting = this.modelSetting;
+        if (!modelSetting)
+            return;
+        const path = this.modelHomeDir + modelSetting.getModelFile();
         this.loadModelData(path, model => {
-            for (let i = 0; i < this.modelSetting.getTextureNum(); i++) {
-                const texPaths = this.modelHomeDir + this.modelSetting.getTextureFile(i);
+            for (let i = 0; i < modelSetting.getTextureNum(); i++) {
+                const texPaths = this.modelHomeDir + modelSetting.getTextureFile(i);
                 this.loadTexture(i, texPaths, () => {
                     if (this.isTexLoaded) {
-                        if (this.modelSetting.getExpressionNum() > 0) {
+                        if (modelSetting.getExpressionNum() > 0) {
                             this.expressions = {};
-                            for (let j = 0; j < this.modelSetting.getExpressionNum(); j++) {
-                                const expName = this.modelSetting.getExpressionName(j);
+                            for (let j = 0; j < modelSetting.getExpressionNum(); j++) {
+                                const expName = modelSetting.getExpressionName(j);
                                 const expFilePath = this.modelHomeDir +
-                                    this.modelSetting.getExpressionFile(j);
+                                    modelSetting.getExpressionFile(j);
                                 this.loadExpression(expName, expFilePath);
                             }
                         }
@@ -33,22 +36,23 @@ class LAppModel extends L2DBaseModel {
                         if (this.eyeBlink == null) {
                             this.eyeBlink = new L2DEyeBlink();
                         }
-                        if (this.modelSetting.getPhysicsFile() != null) {
-                            this.loadPhysics(this.modelHomeDir + this.modelSetting.getPhysicsFile());
+                        if (modelSetting.getPhysicsFile() != null) {
+                            this.loadPhysics(this.modelHomeDir + modelSetting.getPhysicsFile());
                         }
                         else {
                             this.physics = null;
                         }
-                        if (this.modelSetting.getPoseFile() != null) {
-                            this.loadPose(this.modelHomeDir + this.modelSetting.getPoseFile(), () => {
-                                this.pose.updateParam(this.live2DModel);
+                        if (modelSetting.getPoseFile() != null) {
+                            this.loadPose(this.modelHomeDir + modelSetting.getPoseFile(), () => {
+                                if (this.pose && this.live2DModel)
+                                    this.pose.updateParam(this.live2DModel);
                             });
                         }
                         else {
                             this.pose = null;
                         }
-                        if (this.modelSetting.getLayout() != null) {
-                            const layout = this.modelSetting.getLayout();
+                        if (modelSetting.getLayout() != null) {
+                            const layout = modelSetting.getLayout();
                             if (layout['width'] != null)
                                 this.modelMatrix.setWidth(layout['width']);
                             if (layout['height'] != null)
@@ -70,11 +74,11 @@ class LAppModel extends L2DBaseModel {
                             if (layout['right'] != null)
                                 this.modelMatrix.right(layout['right']);
                         }
-                        for (let j = 0; j < this.modelSetting.getInitParamNum(); j++) {
-                            this.live2DModel.setParamFloat(this.modelSetting.getInitParamID(j), this.modelSetting.getInitParamValue(j));
+                        for (let j = 0; j < modelSetting.getInitParamNum(); j++) {
+                            this.live2DModel.setParamFloat(modelSetting.getInitParamID(j), modelSetting.getInitParamValue(j));
                         }
-                        for (let j = 0; j < this.modelSetting.getInitPartsVisibleNum(); j++) {
-                            this.live2DModel.setPartsOpacity(this.modelSetting.getInitPartsVisibleID(j), this.modelSetting.getInitPartsVisibleValue(j));
+                        for (let j = 0; j < modelSetting.getInitPartsVisibleNum(); j++) {
+                            this.live2DModel.setPartsOpacity(modelSetting.getInitPartsVisibleID(j), modelSetting.getInitPartsVisibleValue(j));
                         }
                         this.live2DModel.saveParam();
                         this.preloadMotionGroup(LAppDefine.MOTION_GROUP_IDLE);
@@ -94,7 +98,7 @@ class LAppModel extends L2DBaseModel {
         this.modelHomeDir = modelSettingPath.substring(0, modelSettingPath.lastIndexOf('/') + 1);
         this.modelSetting = new ModelSettingJson();
         this.modelSetting.json = modelSetting;
-        await new Promise(resolve => this.loadJSON(resolve));
+        await new Promise(resolve => this.loadJSON(() => resolve()));
     }
     load(gl, modelSettingPath, callback) {
         this.setUpdating(true);
@@ -110,11 +114,14 @@ class LAppModel extends L2DBaseModel {
         gl.deleteTexture(pm.texture);
     }
     preloadMotionGroup(name) {
-        for (let i = 0; i < this.modelSetting.getMotionNum(name); i++) {
-            const file = this.modelSetting.getMotionFile(name, i);
+        const modelSetting = this.modelSetting;
+        if (!modelSetting)
+            return;
+        for (let i = 0; i < modelSetting.getMotionNum(name); i++) {
+            const file = modelSetting.getMotionFile(name, i);
             this.loadMotion(file, this.modelHomeDir + file, motion => {
-                motion.setFadeIn(this.modelSetting.getMotionFadeIn(name, i));
-                motion.setFadeOut(this.modelSetting.getMotionFadeOut(name, i));
+                motion.setFadeIn(modelSetting.getMotionFadeIn(name, i));
+                motion.setFadeOut(modelSetting.getMotionFadeOut(name, i));
             });
         }
     }
@@ -169,12 +176,14 @@ class LAppModel extends L2DBaseModel {
         for (const name in this.expressions) {
             tmp.push(name);
         }
-        const no = parseInt(Math.random() * tmp.length);
+        const no = Math.floor(Math.random() * tmp.length);
         this.setExpression(tmp[no]);
     }
     startRandomMotion(name, priority) {
+        if (!this.modelSetting)
+            return;
         const max = this.modelSetting.getMotionNum(name);
-        const no = parseInt(Math.random() * max);
+        const no = Math.floor(Math.random() * max);
         this.startMotion(name, no, priority);
     }
     startMotion(name, no, priority) {
@@ -202,6 +211,8 @@ class LAppModel extends L2DBaseModel {
         }
     }
     setFadeInFadeOut(name, no, priority, motion) {
+        if (!this.modelSetting)
+            return;
         const motionName = this.modelSetting.getMotionFile(name, no);
         motion.setFadeIn(this.modelSetting.getMotionFadeIn(name, no));
         motion.setFadeOut(this.modelSetting.getMotionFadeOut(name, no));

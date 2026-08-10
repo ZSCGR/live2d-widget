@@ -199,20 +199,12 @@ class L2DExpressionMotion extends AMotion {
             const param = params[i];
             const paramID = param.id.toString();
             let value = parseFloat(param.val);
-            let calcTypeInt = L2DExpressionMotion.TYPE_ADD;
             const calc = param.calc != null ? param.calc.toString() : 'add';
-            if (calc === 'add') {
-                calcTypeInt = L2DExpressionMotion.TYPE_ADD;
-            }
-            else if (calc === 'mult') {
-                calcTypeInt = L2DExpressionMotion.TYPE_MULT;
-            }
-            else if (calc === 'set') {
-                calcTypeInt = L2DExpressionMotion.TYPE_SET;
-            }
-            else {
-                calcTypeInt = L2DExpressionMotion.TYPE_ADD;
-            }
+            const calcTypeInt = calc === 'mult'
+                ? L2DExpressionMotion.TYPE_MULT
+                : calc === 'set'
+                    ? L2DExpressionMotion.TYPE_SET
+                    : L2DExpressionMotion.TYPE_ADD;
             if (calcTypeInt == L2DExpressionMotion.TYPE_ADD) {
                 let defaultValue = param.def == null ? 0 : parseFloat(param.def);
                 value = value - defaultValue;
@@ -285,7 +277,7 @@ class L2DEyeBlink {
     updateParam(model) {
         const time = UtSystem.getUserTimeMSec();
         let eyeParamValue;
-        let t = 0;
+        let t;
         switch (this.eyeState) {
             case EYE_STATE.STATE_CLOSING:
                 t = (time - this.stateStartTime) / this.closingMotionMsec;
@@ -784,11 +776,10 @@ class L2DTargetPoint {
         const vy = (MAX_V * dy) / d;
         let ax = vx - this.faceVX;
         let ay = vy - this.faceVY;
-        let a = Math.sqrt(ax * ax + ay * ay);
+        const a = Math.sqrt(ax * ax + ay * ay);
         if (a < -MAX_A || a > MAX_A) {
             ax *= MAX_A / a;
             ay *= MAX_A / a;
-            a = MAX_A;
         }
         this.faceVX += ax;
         this.faceVY += ay;

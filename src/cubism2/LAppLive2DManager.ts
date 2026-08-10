@@ -4,8 +4,12 @@ import LAppModel from './LAppModel.js';
 import PlatformManager from './PlatformManager.js';
 import LAppDefine from './LAppDefine.js';
 import logger from '../logger.js';
+import type { Live2DModelSetting } from './types.js';
 
 class LAppLive2DManager {
+  public model: LAppModel | null;
+  private reloading: boolean;
+
   constructor() {
     this.model = null;
     this.reloading = false;
@@ -14,20 +18,20 @@ class LAppLive2DManager {
     Live2DFramework.setPlatformManager(new PlatformManager());
   }
 
-  getModel() {
+  getModel(): LAppModel | null {
     return this.model;
   }
 
-  releaseModel(gl) {
+  releaseModel(gl: WebGL2RenderingContext) {
     if (this.model) {
       this.model.release(gl);
       this.model = null;
     }
   }
 
-  async changeModel(gl, modelSettingPath) {
+  async changeModel(gl: WebGL2RenderingContext, modelSettingPath: string): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       if (this.reloading) return;
       this.reloading = true;
 
@@ -45,7 +49,7 @@ class LAppLive2DManager {
     });
   }
 
-  async changeModelWithJSON(gl, modelSettingPath, modelSetting) {
+  async changeModelWithJSON(gl: WebGL2RenderingContext, modelSettingPath: string, modelSetting: Live2DModelSetting): Promise<void> {
     if (this.reloading) return;
     this.reloading = true;
 
@@ -60,7 +64,7 @@ class LAppLive2DManager {
     this.reloading = false;
   }
 
-  setDrag(x, y) {
+  setDrag(x: number, y: number) {
     if (this.model) {
       this.model.setDrag(x, y);
     }
@@ -86,7 +90,7 @@ class LAppLive2DManager {
     }
   }
 
-  tapEvent(x, y) {
+  tapEvent(x: number, y: number): boolean {
     logger.trace('tapEvent view x:' + x + ' y:' + y);
 
     if (!this.model) return false;

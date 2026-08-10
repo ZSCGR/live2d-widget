@@ -4,12 +4,13 @@ import LAppDefine from './LAppDefine.js';
 import MatrixStack from './utils/MatrixStack.js';
 import LAppLive2DManager from './LAppLive2DManager.js';
 import logger from '../logger.js';
+import type { Live2DModelSetting, Matrix44, TargetPoint, ViewMatrix } from './types.js';
 
-function normalizePoint(x, y, x0, y0, w, h) {
+function normalizePoint(x: number, y: number, x0: number, y0: number, w: number, h: number) {
   const dx = x - x0;
   const dy = y - y0;
 
-  let targetX = 0, targetY = 0;
+  let targetX, targetY;
 
   if (dx >= 0) {
     targetX = dx / (w - x0);
@@ -28,6 +29,19 @@ function normalizePoint(x, y, x0, y0, w, h) {
 }
 
 class Cubism2Model {
+  public live2DMgr: LAppLive2DManager;
+  public isDrawStart: boolean;
+  public gl: WebGL2RenderingContext | null;
+  public canvas: HTMLCanvasElement | null;
+  private dragMgr: TargetPoint | null;
+  private viewMatrix: ViewMatrix | null;
+  private projMatrix: Matrix44 | null;
+  private deviceToScreen: Matrix44 | null;
+  private oldLen: number;
+  private _boundMouseEvent: (event: MouseEvent | WheelEvent) => void;
+  private _boundTouchEvent: (event: TouchEvent) => void;
+  private _drawFrameId: number | null = null;
+
   constructor() {
     this.live2DMgr = new LAppLive2DManager();
 
@@ -47,8 +61,10 @@ class Cubism2Model {
     this._boundTouchEvent = this.touchEvent.bind(this);
   }
 
-  initL2dCanvas(canvasId) {
-    this.canvas = document.getElementById(canvasId);
+  initL2dCanvas(canvasId: string) {
+    this.canvas = document.getElementById(canvasId) as HTMLCanvasElement | null;
+
+    if (!this.canvas) return;
 
     if (this.canvas.addEventListener) {
       this.canvas.addEventListener('mousewheel', this._boundMouseEvent, false);
@@ -65,12 +81,16 @@ class Cubism2Model {
     }
   }
 
-  async init(canvasId, modelSettingPath, modelSetting) {
+  async init(canvasId: string, modelSettingPath: string, modelSetting: Live2DModelSetting) {
     this.initL2dCanvas(canvasId);
+    if (!this.canvas) {
+      logger.error(`Canvas ${canvasId} not found.`);
+      return;
+    }
     const width = this.canvas.width;
     const height = this.canvas.height;
 
-    this.dragMgr = new L2DTargetPoint();
+    this.dragMgr = new L2DTargetPoint() as TargetPoint;
 
     const ratio = height / width;
     const left = LAppDefine.VIEW_LOGICAL_LEFT;
@@ -78,7 +98,7 @@ class Cubism2Model {
     const bottom = -ratio;
     const top = ratio;
 
-    this.viewMatrix = new L2DViewMatrix();
+    this.viewMatrix = new L2DViewMatrix() as ViewMatrix;
 
     this.viewMatrix.setScreenRect(left, right, bottom, top);
 
@@ -92,10 +112,10 @@ class Cubism2Model {
     this.viewMatrix.setMaxScale(LAppDefine.VIEW_MAX_SCALE);
     this.viewMatrix.setMinScale(LAppDefine.VIEW_MIN_SCALE);
 
-    this.projMatrix = new L2DMatrix44();
+    this.projMatrix = new L2DMatrix44() as Matrix44;
     this.projMatrix.multScale(1, width / height);
 
-    this.deviceToScreen = new L2DMatrix44();
+    this.deviceToScreen = new L2DMatrix44() as Matrix44;
     this.deviceToScreen.multTranslate(-width / 2.0, -height / 2.0);
     this.deviceToScreen.multScale(2 / width, -2 / width);
 
@@ -137,8 +157,9 @@ class Cubism2Model {
     this.isDrawStart = false;
 
     // 3. Release Live2D related resources
-    if (this.live2DMgr && typeof this.live2DMgr.release === 'function') {
-      this.live2DMgr.release();
+    const releasableManager = this.live2DMgr as LAppLive2DManager & { release?: () => void };
+    if (typeof releasableManager.release === 'function') {
+      releasableManager.release();
     }
 
     // 4. Clean up WebGL resources (if any)
@@ -161,7 +182,7 @@ class Cubism2Model {
       this.isDrawStart = true;
       const tick = () => {
         this.draw();
-        this._drawFrameId = window.requestAnimationFrame(tick, this.canvas);
+        this._drawFrameId = window.requestAnimationFrame(tick);
       };
       tick();
     }
@@ -169,6 +190,7 @@ class Cubism2Model {
 
   draw() {
     // logger.trace("--> draw()");
+    if (!this.dragMgr || !this.gl || !this.projMatrix || !this.viewMatrix) return;
 
     MatrixStack.reset();
     MatrixStack.loadIdentity();
@@ -194,15 +216,18 @@ class Cubism2Model {
     MatrixStack.pop();
   }
 
-  async changeModel(modelSettingPath) {
+  async changeModel(modelSettingPath: string) {
+    if (!this.gl) return;
     await this.live2DMgr.changeModel(this.gl, modelSettingPath);
   }
 
-  async changeModelWithJSON(modelSettingPath, modelSetting) {
+  async changeModelWithJSON(modelSettingPath: string, modelSetting: Live2DModelSetting) {
+    if (!this.gl) return;
     await this.live2DMgr.changeModelWithJSON(this.gl, modelSettingPath, modelSetting);
   }
 
-  modelScaling(scale) {
+  modelScaling(scale: number) {
+    if (!this.viewMatrix) return;
     const isMaxScale = this.viewMatrix.isMaxScale();
     const isMinScale = this.viewMatrix.isMinScale();
 
@@ -221,7 +246,8 @@ class Cubism2Model {
     }
   }
 
-  modelTurnHead(event) {
+  modelTurnHead(event: MouseEvent | Touch) {
+    if (!this.canvas || !this.dragMgr) return;
     const rect = this.canvas.getBoundingClientRect();
 
     const { vx, vy } = normalizePoint(event.clientX, event.clientY, rect.left + rect.width / 2, rect.top + rect.height / 2, window.innerWidth, window.innerHeight);
@@ -241,12 +267,13 @@ class Cubism2Model {
     this.dragMgr.setPoint(vx, vy);
     this.live2DMgr.tapEvent(vx, vy);
 
-    if (this.live2DMgr?.model.hitTest(LAppDefine.HIT_AREA_BODY, vx, vy)) {
+    if (this.live2DMgr.model?.hitTest(LAppDefine.HIT_AREA_BODY, vx, vy)) {
       window.dispatchEvent(new Event('live2d:tapbody'));
     }
   }
 
-  followPointer(event) {
+  followPointer(event: MouseEvent | Touch) {
+    if (!this.canvas || !this.dragMgr) return;
     const rect = this.canvas.getBoundingClientRect();
 
     const { vx, vy } = normalizePoint(event.clientX, event.clientY, rect.left + rect.width / 2, rect.top + rect.height / 2, window.innerWidth, window.innerHeight);
@@ -265,21 +292,21 @@ class Cubism2Model {
 
     this.dragMgr.setPoint(vx, vy);
 
-    if (this.live2DMgr?.model.hitTest(LAppDefine.HIT_AREA_BODY, vx, vy)) {
+    if (this.live2DMgr.model?.hitTest(LAppDefine.HIT_AREA_BODY, vx, vy)) {
       window.dispatchEvent(new Event('live2d:hoverbody'));
     }
   }
 
   lookFront() {
-    this.dragMgr.setPoint(0, 0);
+    this.dragMgr?.setPoint(0, 0);
   }
 
-  mouseEvent(e) {
+  mouseEvent(e: MouseEvent | WheelEvent) {
     e.preventDefault();
 
     if (e.type == 'mousewheel') {
-      if (e.wheelDelta > 0) this.modelScaling(1.1);
-      else this.modelScaling(1);
+      if ((e as WheelEvent & { wheelDelta: number }).wheelDelta > 0) this.modelScaling(1.1);
+      else this.modelScaling(0.9);
     } else if (e.type == 'click' || e.type == 'contextmenu') {
       this.modelTurnHead(e);
     } else if (e.type == 'mousemove') {
@@ -289,7 +316,7 @@ class Cubism2Model {
     }
   }
 
-  touchEvent(e) {
+  touchEvent(e: TouchEvent) {
     e.preventDefault();
 
     const touch = e.touches[0];
@@ -317,22 +344,24 @@ class Cubism2Model {
     }
   }
 
-  transformViewX(deviceX) {
+  transformViewX(deviceX: number): number {
+    if (!this.deviceToScreen || !this.viewMatrix) return 0;
     const screenX = this.deviceToScreen.transformX(deviceX);
     return this.viewMatrix.invertTransformX(screenX);
   }
 
-  transformViewY(deviceY) {
+  transformViewY(deviceY: number): number {
+    if (!this.deviceToScreen || !this.viewMatrix) return 0;
     const screenY = this.deviceToScreen.transformY(deviceY);
     return this.viewMatrix.invertTransformY(screenY);
   }
 
-  transformScreenX(deviceX) {
-    return this.deviceToScreen.transformX(deviceX);
+  transformScreenX(deviceX: number): number {
+    return this.deviceToScreen?.transformX(deviceX) ?? 0;
   }
 
-  transformScreenY(deviceY) {
-    return this.deviceToScreen.transformY(deviceY);
+  transformScreenY(deviceY: number): number {
+    return this.deviceToScreen?.transformY(deviceY) ?? 0;
   }
 }
 

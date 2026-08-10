@@ -16,10 +16,16 @@ class AppSubdelegate extends LAppSubdelegate {
    * @param {HTMLCanvasElement} canvas The canvas object passed in
    */
   initialize(canvas) {
-    // Initialize WebGL manager, return false if failed
-    if (!this._glManager.initialize(canvas)) {
+    // Preserve the drawing buffer so the photo tool can export moc3 models.
+    const context = canvas.getContext('webgl2', {
+      premultipliedAlpha: true,
+      preserveDrawingBuffer: true
+    });
+    if (!context) {
+      logger.error('Cannot initialize WebGL. This browser does not support.');
       return false;
     }
+    this._glManager._gl = context;
 
     this._canvas = canvas;
 

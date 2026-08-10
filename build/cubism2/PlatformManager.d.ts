@@ -1,8 +1,11 @@
-export default PlatformManager;
+import type { Live2DModelRuntime } from './types.js';
 declare class PlatformManager {
-    cache: {};
-    loadBytes(path: any, callback: any): any;
-    loadLive2DModel(path: any, callback: any): void;
-    loadTexture(model: any, no: any, path: any, callback: any): void;
-    jsonParseFromBytes(buf: any): any;
+    private readonly cache;
+    texture?: WebGLTexture;
+    constructor();
+    loadBytes(path: string, callback: (buf: ArrayBuffer) => void): void;
+    loadLive2DModel(path: string, callback: (model: Live2DModelRuntime) => void): void;
+    loadTexture(model: Live2DModelRuntime, no: number, path: string, callback?: () => void): void;
+    jsonParseFromBytes(buf: ArrayBuffer): unknown;
 }
+export default PlatformManager;

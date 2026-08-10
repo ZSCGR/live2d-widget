@@ -5,6 +5,7 @@ import { ToolsManager } from './tools.js';
 import logger from './logger.js';
 import registerDrag from './drag.js';
 import { fa_child } from './icons.js';
+const WAIFU_DISABLED_KEY = 'waifu-disabled';
 function registerEventListener(tips) {
     let userAction = false;
     let userActionTimer;
@@ -111,6 +112,9 @@ async function loadWidget(config) {
 function initWidget(config) {
     if (typeof config === 'string') {
         logger.error('Your config for Live2D initWidget is outdated. Please refer to https://github.com/stevenjoezhang/live2d-widget/blob/master/dist/autoload.js');
+        return;
+    }
+    if (localStorage.getItem(WAIFU_DISABLED_KEY) === 'true') {
         return;
     }
     logger.setLevel(config.logLevel);

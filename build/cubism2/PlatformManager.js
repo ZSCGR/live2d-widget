@@ -27,8 +27,16 @@ class PlatformManager {
         loadedImage.src = path;
         loadedImage.onload = () => {
             const canvas = document.getElementById('live2d');
+            if (!canvas) {
+                logger.error('Canvas live2d not found.');
+                return -1;
+            }
             const gl = canvas.getContext('webgl2', { premultipliedAlpha: true, preserveDrawingBuffer: true });
-            let texture = gl.createTexture();
+            if (!gl) {
+                logger.error('Failed to create WebGL context.');
+                return -1;
+            }
+            const texture = gl.createTexture();
             if (!texture) {
                 logger.error('Failed to generate gl texture name.');
                 return -1;
@@ -44,7 +52,6 @@ class PlatformManager {
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
             gl.generateMipmap(gl.TEXTURE_2D);
             model.setTexture(no, texture);
-            texture = null;
             if (typeof callback == 'function')
                 callback();
         };

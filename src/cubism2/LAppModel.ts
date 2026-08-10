@@ -4,6 +4,15 @@ import ModelSettingJson from './utils/ModelSettingJson.js';
 import LAppDefine from './LAppDefine.js';
 import MatrixStack from './utils/MatrixStack.js';
 import logger from '../logger.js';
+import type {
+  Cubism2Layout,
+  Live2DModelRuntime,
+  Live2DModelSetting,
+  ModelEffect,
+  ModelMatrix,
+  Motion,
+  MotionManager,
+} from './types.js';
 
 //============================================================
 //============================================================
@@ -11,6 +20,37 @@ import logger from '../logger.js';
 //============================================================
 //============================================================
 class LAppModel extends L2DBaseModel {
+  public modelHomeDir: string;
+  public modelSetting: ModelSettingJson | null;
+  public tmpMatrix: number[];
+  public live2DModel: Live2DModelRuntime | null;
+  public modelMatrix: ModelMatrix;
+  public eyeBlink: ModelEffect | null;
+  public physics: ModelEffect | null;
+  public pose: ModelEffect | null;
+  public initialized: boolean;
+  public updating: boolean;
+  public lipSync: boolean;
+  public lipSyncValue: number;
+  public dragX: number;
+  public dragY: number;
+  public startTimeMSec: number;
+  public mainMotionManager: MotionManager;
+  public expressionManager: MotionManager | null;
+  public motions: Record<string, Motion>;
+  public expressions: Record<string, Motion>;
+  public isTexLoaded: boolean;
+  public loadModelData: (path: string, callback: (model: Live2DModelRuntime) => void) => void;
+  public loadTexture: (no: number, path: string, callback?: () => void) => void;
+  public loadMotion: (name: string | null, path: string, callback?: (motion: Motion) => void) => void;
+  public loadExpression: (name: string | null, path: string, callback?: () => void) => void;
+  public loadPhysics: (path: string) => void;
+  public loadPose: (path: string, callback?: () => void) => void;
+  public setUpdating: (value: boolean) => void;
+  public setInitialized: (value: boolean) => void;
+  public setDrag: (x: number, y: number) => void;
+  public hitTestSimple: (drawID: string | null, testX: number, testY: number) => boolean;
+
   constructor() {
     //L2DBaseModel.apply(this, arguments);
     super();
@@ -20,28 +60,30 @@ class LAppModel extends L2DBaseModel {
     this.tmpMatrix = [];
   }
 
-  loadJSON(callback) {
-    const path = this.modelHomeDir + this.modelSetting.getModelFile();
+  loadJSON(callback?: () => void) {
+    const modelSetting = this.modelSetting;
+    if (!modelSetting) return;
+    const path = this.modelHomeDir + modelSetting.getModelFile();
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     this.loadModelData(path, model => {
-      for (let i = 0; i < this.modelSetting.getTextureNum(); i++) {
+      for (let i = 0; i < modelSetting.getTextureNum(); i++) {
         const texPaths =
-          this.modelHomeDir + this.modelSetting.getTextureFile(i);
+          this.modelHomeDir + modelSetting.getTextureFile(i);
 
         this.loadTexture(i, texPaths, () => {
           if (this.isTexLoaded) {
-            if (this.modelSetting.getExpressionNum() > 0) {
+            if (modelSetting.getExpressionNum() > 0) {
               this.expressions = {};
 
               for (
                 let j = 0;
-                j < this.modelSetting.getExpressionNum();
+                j < modelSetting.getExpressionNum();
                 j++
               ) {
-                const expName = this.modelSetting.getExpressionName(j);
+                const expName = modelSetting.getExpressionName(j);
                 const expFilePath =
                   this.modelHomeDir +
-                  this.modelSetting.getExpressionFile(j);
+                  modelSetting.getExpressionFile(j);
 
                 this.loadExpression(expName, expFilePath);
               }
@@ -54,27 +96,27 @@ class LAppModel extends L2DBaseModel {
               this.eyeBlink = new L2DEyeBlink();
             }
 
-            if (this.modelSetting.getPhysicsFile() != null) {
+            if (modelSetting.getPhysicsFile() != null) {
               this.loadPhysics(
-                this.modelHomeDir + this.modelSetting.getPhysicsFile(),
+                this.modelHomeDir + modelSetting.getPhysicsFile(),
               );
             } else {
               this.physics = null;
             }
 
-            if (this.modelSetting.getPoseFile() != null) {
+            if (modelSetting.getPoseFile() != null) {
               this.loadPose(
-                this.modelHomeDir + this.modelSetting.getPoseFile(),
+                this.modelHomeDir + modelSetting.getPoseFile(),
                 () => {
-                  this.pose.updateParam(this.live2DModel);
+                  if (this.pose && this.live2DModel) this.pose.updateParam(this.live2DModel);
                 },
               );
             } else {
               this.pose = null;
             }
 
-            if (this.modelSetting.getLayout() != null) {
-              const layout = this.modelSetting.getLayout();
+            if (modelSetting.getLayout() != null) {
+              const layout = modelSetting.getLayout() as Cubism2Layout;
               if (layout['width'] != null)
                 this.modelMatrix.setWidth(layout['width']);
               if (layout['height'] != null)
@@ -96,21 +138,21 @@ class LAppModel extends L2DBaseModel {
                 this.modelMatrix.right(layout['right']);
             }
 
-            for (let j = 0; j < this.modelSetting.getInitParamNum(); j++) {
+            for (let j = 0; j < modelSetting.getInitParamNum(); j++) {
               this.live2DModel.setParamFloat(
-                this.modelSetting.getInitParamID(j),
-                this.modelSetting.getInitParamValue(j),
+                modelSetting.getInitParamID(j),
+                modelSetting.getInitParamValue(j),
               );
             }
 
             for (
               let j = 0;
-              j < this.modelSetting.getInitPartsVisibleNum();
+              j < modelSetting.getInitPartsVisibleNum();
               j++
             ) {
               this.live2DModel.setPartsOpacity(
-                this.modelSetting.getInitPartsVisibleID(j),
-                this.modelSetting.getInitPartsVisibleValue(j),
+                modelSetting.getInitPartsVisibleID(j),
+                modelSetting.getInitPartsVisibleValue(j),
               );
             }
 
@@ -130,7 +172,7 @@ class LAppModel extends L2DBaseModel {
     });
   }
 
-  async loadModelSetting(modelSettingPath, modelSetting) {
+  async loadModelSetting(modelSettingPath: string, modelSetting: Live2DModelSetting) {
     this.setUpdating(true);
     this.setInitialized(false);
 
@@ -141,10 +183,10 @@ class LAppModel extends L2DBaseModel {
 
     this.modelSetting = new ModelSettingJson();
     this.modelSetting.json = modelSetting;
-    await new Promise(resolve => this.loadJSON(resolve));
+    await new Promise<void>(resolve => this.loadJSON(() => resolve()));
   }
 
-  load(gl, modelSettingPath, callback) {
+  load(gl: WebGL2RenderingContext, modelSettingPath: string, callback?: () => void) {
     this.setUpdating(true);
     this.setInitialized(false);
 
@@ -160,19 +202,21 @@ class LAppModel extends L2DBaseModel {
     });
   }
 
-  release(gl) {
+  release(gl: WebGL2RenderingContext) {
     // this.live2DModel.deleteTextures();
     const pm = Live2DFramework.getPlatformManager();
 
     gl.deleteTexture(pm.texture);
   }
 
-  preloadMotionGroup(name) {
-    for (let i = 0; i < this.modelSetting.getMotionNum(name); i++) {
-      const file = this.modelSetting.getMotionFile(name, i);
+  preloadMotionGroup(name: string) {
+    const modelSetting = this.modelSetting;
+    if (!modelSetting) return;
+    for (let i = 0; i < modelSetting.getMotionNum(name); i++) {
+      const file = modelSetting.getMotionFile(name, i);
       this.loadMotion(file, this.modelHomeDir + file, motion => {
-        motion.setFadeIn(this.modelSetting.getMotionFadeIn(name, i));
-        motion.setFadeOut(this.modelSetting.getMotionFadeOut(name, i));
+        motion.setFadeIn(modelSetting.getMotionFadeIn(name, i));
+        motion.setFadeOut(modelSetting.getMotionFadeOut(name, i));
       });
     }
   }
@@ -275,23 +319,24 @@ class LAppModel extends L2DBaseModel {
   }
 
   setRandomExpression() {
-    const tmp = [];
+    const tmp: string[] = [];
     for (const name in this.expressions) {
       tmp.push(name);
     }
 
-    const no = parseInt(Math.random() * tmp.length);
+    const no = Math.floor(Math.random() * tmp.length);
 
     this.setExpression(tmp[no]);
   }
 
-  startRandomMotion(name, priority) {
+  startRandomMotion(name: string, priority: number) {
+    if (!this.modelSetting) return;
     const max = this.modelSetting.getMotionNum(name);
-    const no = parseInt(Math.random() * max);
+    const no = Math.floor(Math.random() * max);
     this.startMotion(name, no, priority);
   }
 
-  startMotion(name, no, priority) {
+  startMotion(name: string, no: number, priority: number) {
     // logger.trace("startMotion : " + name + " " + no + " " + priority);
 
     const motionName = this.modelSetting.getMotionFile(name, no);
@@ -322,7 +367,8 @@ class LAppModel extends L2DBaseModel {
     }
   }
 
-  setFadeInFadeOut(name, no, priority, motion) {
+  setFadeInFadeOut(name: string, no: number, priority: number, motion: Motion) {
+    if (!this.modelSetting) return;
     const motionName = this.modelSetting.getMotionFile(name, no);
 
     motion.setFadeIn(this.modelSetting.getMotionFadeIn(name, no));
@@ -346,7 +392,7 @@ class LAppModel extends L2DBaseModel {
     }
   }
 
-  setExpression(name) {
+  setExpression(name: string) {
     const motion = this.expressions[name];
 
     logger.trace('Expression : ' + name);
@@ -355,7 +401,7 @@ class LAppModel extends L2DBaseModel {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  draw(gl) {
+  draw(gl: WebGL2RenderingContext) {
     //logger.trace("--> LAppModel.draw()");
 
     // if(this.live2DModel == null) return;
@@ -371,7 +417,7 @@ class LAppModel extends L2DBaseModel {
     MatrixStack.pop();
   }
 
-  hitTest(id, testX, testY) {
+  hitTest(id: string, testX: number, testY: number): boolean {
     const len = this.modelSetting.getHitAreaNum();
     if (len == 0) {
       const hitAreasCustom = this.modelSetting.getHitAreaCustom();

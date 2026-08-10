@@ -1,14 +1,16 @@
-export default LAppLive2DManager;
+import LAppModel from './LAppModel.js';
+import type { Live2DModelSetting } from './types.js';
 declare class LAppLive2DManager {
-    model: LAppModel;
-    reloading: boolean;
-    getModel(): LAppModel;
-    releaseModel(gl: any): void;
-    changeModel(gl: any, modelSettingPath: any): Promise<any>;
-    changeModelWithJSON(gl: any, modelSettingPath: any, modelSetting: any): Promise<void>;
-    setDrag(x: any, y: any): void;
+    model: LAppModel | null;
+    private reloading;
+    constructor();
+    getModel(): LAppModel | null;
+    releaseModel(gl: WebGL2RenderingContext): void;
+    changeModel(gl: WebGL2RenderingContext, modelSettingPath: string): Promise<void>;
+    changeModelWithJSON(gl: WebGL2RenderingContext, modelSettingPath: string, modelSetting: Live2DModelSetting): Promise<void>;
+    setDrag(x: number, y: number): void;
     maxScaleEvent(): void;
     minScaleEvent(): void;
-    tapEvent(x: any, y: any): boolean;
+    tapEvent(x: number, y: number): boolean;
 }
-import LAppModel from './LAppModel.js';
+export default LAppLive2DManager;

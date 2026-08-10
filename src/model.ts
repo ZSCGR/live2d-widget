@@ -62,6 +62,12 @@ interface Config {
    */
   drag?: boolean;
   /**
+   * Whether to show the toggle button after quitting the widget.
+   * If false, quitting permanently disables the widget until localStorage is cleared.
+   * @type {boolean | undefined}
+   */
+  showToggleAfterQuit?: boolean;
+  /**
    * Log level.
    * @type {LogLevel | undefined}
    */

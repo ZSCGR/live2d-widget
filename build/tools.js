@@ -1,5 +1,6 @@
 import { fa_comment, fa_paper_plane, fa_street_view, fa_shirt, fa_camera_retro, fa_info_circle, fa_xmark } from './icons.js';
 import { showMessage, i18n } from './message.js';
+const WAIFU_DISABLED_KEY = 'waifu-disabled';
 class ToolsManager {
     constructor(model, config, tips) {
         this.config = config;
@@ -75,7 +76,15 @@ class ToolsManager {
             quit: {
                 icon: fa_xmark,
                 callback: () => {
-                    localStorage.setItem('waifu-display', Date.now().toString());
+                    var _b;
+                    const showToggleAfterQuit = (_b = this.config.showToggleAfterQuit) !== null && _b !== void 0 ? _b : true;
+                    if (showToggleAfterQuit) {
+                        localStorage.setItem('waifu-display', Date.now().toString());
+                    }
+                    else {
+                        localStorage.setItem(WAIFU_DISABLED_KEY, 'true');
+                        localStorage.removeItem('waifu-display');
+                    }
                     const message = tips.message.goodbye;
                     showMessage(message, 2000, 11);
                     const waifu = document.getElementById('waifu');
@@ -83,9 +92,15 @@ class ToolsManager {
                         return;
                     waifu.classList.remove('waifu-active');
                     setTimeout(() => {
+                        var _b;
                         waifu.classList.add('waifu-hidden');
-                        const waifuToggle = document.getElementById('waifu-toggle');
-                        waifuToggle === null || waifuToggle === void 0 ? void 0 : waifuToggle.classList.add('waifu-toggle-active');
+                        if (showToggleAfterQuit) {
+                            const waifuToggle = document.getElementById('waifu-toggle');
+                            waifuToggle === null || waifuToggle === void 0 ? void 0 : waifuToggle.classList.add('waifu-toggle-active');
+                        }
+                        else {
+                            (_b = document.getElementById('waifu-toggle')) === null || _b === void 0 ? void 0 : _b.remove();
+                        }
                     }, 3000);
                 }
             }

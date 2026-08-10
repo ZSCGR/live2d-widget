@@ -16,6 +16,8 @@ import { showMessage, i18n } from './message.js';
 import type { Config, ModelManager } from './model.js';
 import type { Tips } from './widget.js';
 
+const WAIFU_DISABLED_KEY = 'waifu-disabled';
+
 interface Tools {
   /**
    * Key-value pairs of tools, where the key is the tool name.
@@ -116,7 +118,13 @@ class ToolsManager {
       quit: {
         icon: fa_xmark,
         callback: () => {
-          localStorage.setItem('waifu-display', Date.now().toString());
+          const showToggleAfterQuit = this.config.showToggleAfterQuit ?? true;
+          if (showToggleAfterQuit) {
+            localStorage.setItem('waifu-display', Date.now().toString());
+          } else {
+            localStorage.setItem(WAIFU_DISABLED_KEY, 'true');
+            localStorage.removeItem('waifu-display');
+          }
           const message = tips.message.goodbye;
           showMessage(message, 2000, 11);
           const waifu = document.getElementById('waifu');
@@ -124,8 +132,12 @@ class ToolsManager {
           waifu.classList.remove('waifu-active');
           setTimeout(() => {
             waifu.classList.add('waifu-hidden');
-            const waifuToggle = document.getElementById('waifu-toggle');
-            waifuToggle?.classList.add('waifu-toggle-active');
+            if (showToggleAfterQuit) {
+              const waifuToggle = document.getElementById('waifu-toggle');
+              waifuToggle?.classList.add('waifu-toggle-active');
+            } else {
+              document.getElementById('waifu-toggle')?.remove();
+            }
           }, 3000);
         }
       }

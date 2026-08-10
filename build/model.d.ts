@@ -13,6 +13,7 @@ interface Config {
     modelId?: number;
     tools?: string[];
     drag?: boolean;
+    showToggleAfterQuit?: boolean;
     logLevel?: LogLevel;
 }
 declare class ModelManager {

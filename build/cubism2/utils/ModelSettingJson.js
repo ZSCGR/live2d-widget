@@ -23,7 +23,7 @@ class ModelSettingJson {
     }
     loadModelSetting(path, callback) {
         const pm = Live2DFramework.getPlatformManager();
-        pm.loadBytes(path, buf => {
+        pm.loadBytes(path, (buf) => {
             const str = String.fromCharCode.apply(null, new Uint8Array(buf));
             this.json = JSON.parse(str);
             callback();

@@ -6,7 +6,7 @@ import logger from '../logger.js';
 function normalizePoint(x, y, x0, y0, w, h) {
     const dx = x - x0;
     const dy = y - y0;
-    let targetX = 0, targetY = 0;
+    let targetX, targetY;
     if (dx >= 0) {
         targetX = dx / (w - x0);
     }
@@ -26,6 +26,7 @@ function normalizePoint(x, y, x0, y0, w, h) {
 }
 class Cubism2Model {
     constructor() {
+        this._drawFrameId = null;
         this.live2DMgr = new LAppLive2DManager();
         this.isDrawStart = false;
         this.gl = null;
@@ -40,6 +41,8 @@ class Cubism2Model {
     }
     initL2dCanvas(canvasId) {
         this.canvas = document.getElementById(canvasId);
+        if (!this.canvas)
+            return;
         if (this.canvas.addEventListener) {
             this.canvas.addEventListener('mousewheel', this._boundMouseEvent, false);
             this.canvas.addEventListener('click', this._boundMouseEvent, false);
@@ -53,6 +56,10 @@ class Cubism2Model {
     }
     async init(canvasId, modelSettingPath, modelSetting) {
         this.initL2dCanvas(canvasId);
+        if (!this.canvas) {
+            logger.error(`Canvas ${canvasId} not found.`);
+            return;
+        }
         const width = this.canvas.width;
         const height = this.canvas.height;
         this.dragMgr = new L2DTargetPoint();
@@ -97,8 +104,9 @@ class Cubism2Model {
             this._drawFrameId = null;
         }
         this.isDrawStart = false;
-        if (this.live2DMgr && typeof this.live2DMgr.release === 'function') {
-            this.live2DMgr.release();
+        const releasableManager = this.live2DMgr;
+        if (typeof releasableManager.release === 'function') {
+            releasableManager.release();
         }
         if (this.gl) {
         }
@@ -114,12 +122,14 @@ class Cubism2Model {
             this.isDrawStart = true;
             const tick = () => {
                 this.draw();
-                this._drawFrameId = window.requestAnimationFrame(tick, this.canvas);
+                this._drawFrameId = window.requestAnimationFrame(tick);
             };
             tick();
         }
     }
     draw() {
+        if (!this.dragMgr || !this.gl || !this.projMatrix || !this.viewMatrix)
+            return;
         MatrixStack.reset();
         MatrixStack.loadIdentity();
         this.dragMgr.update();
@@ -138,12 +148,18 @@ class Cubism2Model {
         MatrixStack.pop();
     }
     async changeModel(modelSettingPath) {
+        if (!this.gl)
+            return;
         await this.live2DMgr.changeModel(this.gl, modelSettingPath);
     }
     async changeModelWithJSON(modelSettingPath, modelSetting) {
+        if (!this.gl)
+            return;
         await this.live2DMgr.changeModelWithJSON(this.gl, modelSettingPath, modelSetting);
     }
     modelScaling(scale) {
+        if (!this.viewMatrix)
+            return;
         const isMaxScale = this.viewMatrix.isMaxScale();
         const isMinScale = this.viewMatrix.isMinScale();
         this.viewMatrix.adjustScale(0, 0, scale);
@@ -160,6 +176,8 @@ class Cubism2Model {
     }
     modelTurnHead(event) {
         var _b;
+        if (!this.canvas || !this.dragMgr)
+            return;
         const rect = this.canvas.getBoundingClientRect();
         const { vx, vy } = normalizePoint(event.clientX, event.clientY, rect.left + rect.width / 2, rect.top + rect.height / 2, window.innerWidth, window.innerHeight);
         logger.trace('onMouseDown device( x:' +
@@ -173,12 +191,14 @@ class Cubism2Model {
             ')');
         this.dragMgr.setPoint(vx, vy);
         this.live2DMgr.tapEvent(vx, vy);
-        if ((_b = this.live2DMgr) === null || _b === void 0 ? void 0 : _b.model.hitTest(LAppDefine.HIT_AREA_BODY, vx, vy)) {
+        if ((_b = this.live2DMgr.model) === null || _b === void 0 ? void 0 : _b.hitTest(LAppDefine.HIT_AREA_BODY, vx, vy)) {
             window.dispatchEvent(new Event('live2d:tapbody'));
         }
     }
     followPointer(event) {
         var _b;
+        if (!this.canvas || !this.dragMgr)
+            return;
         const rect = this.canvas.getBoundingClientRect();
         const { vx, vy } = normalizePoint(event.clientX, event.clientY, rect.left + rect.width / 2, rect.top + rect.height / 2, window.innerWidth, window.innerHeight);
         logger.trace('onMouseMove device( x:' +
@@ -191,12 +211,13 @@ class Cubism2Model {
             vy +
             ')');
         this.dragMgr.setPoint(vx, vy);
-        if ((_b = this.live2DMgr) === null || _b === void 0 ? void 0 : _b.model.hitTest(LAppDefine.HIT_AREA_BODY, vx, vy)) {
+        if ((_b = this.live2DMgr.model) === null || _b === void 0 ? void 0 : _b.hitTest(LAppDefine.HIT_AREA_BODY, vx, vy)) {
             window.dispatchEvent(new Event('live2d:hoverbody'));
         }
     }
     lookFront() {
-        this.dragMgr.setPoint(0, 0);
+        var _b;
+        (_b = this.dragMgr) === null || _b === void 0 ? void 0 : _b.setPoint(0, 0);
     }
     mouseEvent(e) {
         e.preventDefault();
@@ -204,7 +225,7 @@ class Cubism2Model {
             if (e.wheelDelta > 0)
                 this.modelScaling(1.1);
             else
-                this.modelScaling(1);
+                this.modelScaling(0.9);
         }
         else if (e.type == 'click' || e.type == 'contextmenu') {
             this.modelTurnHead(e);
@@ -242,18 +263,24 @@ class Cubism2Model {
         }
     }
     transformViewX(deviceX) {
+        if (!this.deviceToScreen || !this.viewMatrix)
+            return 0;
         const screenX = this.deviceToScreen.transformX(deviceX);
         return this.viewMatrix.invertTransformX(screenX);
     }
     transformViewY(deviceY) {
+        if (!this.deviceToScreen || !this.viewMatrix)
+            return 0;
         const screenY = this.deviceToScreen.transformY(deviceY);
         return this.viewMatrix.invertTransformY(screenY);
     }
     transformScreenX(deviceX) {
-        return this.deviceToScreen.transformX(deviceX);
+        var _b, _c;
+        return (_c = (_b = this.deviceToScreen) === null || _b === void 0 ? void 0 : _b.transformX(deviceX)) !== null && _c !== void 0 ? _c : 0;
     }
     transformScreenY(deviceY) {
-        return this.deviceToScreen.transformY(deviceY);
+        var _b, _c;
+        return (_c = (_b = this.deviceToScreen) === null || _b === void 0 ? void 0 : _b.transformY(deviceY)) !== null && _c !== void 0 ? _c : 0;
     }
 }
 export default Cubism2Model;

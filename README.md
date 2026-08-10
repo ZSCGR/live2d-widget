@@ -30,7 +30,7 @@
 如果你是小白，或者只需要最基础的功能，那么只用将这一行代码加入 html 页面的 `head` 或 `body` 中，即可加载看板娘：
 
 ```html
-<script src="https://fastly.jsdelivr.net/npm/live2d-widgets@1.0.0-rc.6/dist/autoload.js"></script>
+<script src="https://fastly.jsdelivr.net/npm/live2d-widgets@1.0.1/dist/autoload.js"></script>
 ```
 
 添加代码的位置取决于你的网站的构建方式。例如，如果你使用的是 [Hexo](https://hexo.io)，那么需要在主题的模版文件中添加以上代码。对于用各种模版引擎生成的页面，修改方法类似。  
@@ -45,13 +45,14 @@
 
 | 选项 | 类型 | 默认值 | 说明 |
 | - | - | - | - |
-| `waifuPath` | `string` | `https://fastly.jsdelivr.net/npm/live2d-widgets@1/dist/waifu-tips.json` | 看板娘资源路径，可自行修改 |
+| `waifuPath` | `string` | `https://fastly.jsdelivr.net/npm/live2d-widgets@1.0.1/dist/waifu-tips.json` | 看板娘资源路径，可自行修改 |
 | `cdnPath` | `string` | `https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/` | CDN 路径 |
-| `cubism2Path` | `string` | `https://fastly.jsdelivr.net/npm/live2d-widgets@1/dist/live2d.min.js` | Cubism 2 Core 路径 |
+| `cubism2Path` | `string` | `https://fastly.jsdelivr.net/npm/live2d-widgets@1.0.1/dist/live2d.min.js` | Cubism 2 Core 路径 |
 | `cubism5Path` | `string` | `https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js` | Cubism 5 Core 路径 |
 | `modelId` | `number` | `0` | 默认模型 id |
 | `tools` | `string[]` | 见 `autoload.js` | 加载的小工具按钮 |
 | `drag` | `boolean` | `false` | 支持拖动看板娘 |
+| `showToggleAfterQuit` | `boolean` | `true` | 点击关闭后是否显示重新唤起按钮；若设为 `false`，则会永久关闭，直到清除本地存储 |
 | `logLevel` | `string` | `error` | 日志等级，支持 `error`，`warn`，`info`，`trace` |
 
 ## 模型仓库

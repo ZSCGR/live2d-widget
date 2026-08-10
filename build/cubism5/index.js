@@ -7,9 +7,15 @@ import logger from '../logger.js';
 LAppPal.printMessage = () => { };
 class AppSubdelegate extends LAppSubdelegate {
     initialize(canvas) {
-        if (!this._glManager.initialize(canvas)) {
+        const context = canvas.getContext('webgl2', {
+            premultipliedAlpha: true,
+            preserveDrawingBuffer: true
+        });
+        if (!context) {
+            logger.error('Cannot initialize WebGL. This browser does not support.');
             return false;
         }
+        this._glManager._gl = context;
         this._canvas = canvas;
         if (LAppDefine.CanvasSize === 'auto') {
             this.resizeCanvas();

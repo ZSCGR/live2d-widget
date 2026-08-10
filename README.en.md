@@ -30,7 +30,7 @@ You can also check out example web pages:
 If you are a beginner or only need the basic functionality, you can simply add the following line of code to the `head` or `body` of your HTML page to load the widget:
 
 ```html
-<script src="https://fastly.jsdelivr.net/npm/live2d-widgets@1.0.0-rc.6/dist/autoload.js"></script>
+<script src="https://fastly.jsdelivr.net/npm/live2d-widgets@1.0.1/dist/autoload.js"></script>
 ```
 
 The placement of the code depends on how your website is built. For example, if you are using [Hexo](https://hexo.io), you need to add the above code to the template file of your theme. The modification process is similar for pages generated using various template engines.  
@@ -45,13 +45,14 @@ You can refer to the source code of `dist/autoload.js` to see the available conf
 
 | Option | Type | Default Value | Description |
 | ------ | ---- | ------------- | ----------- |
-| `waifuPath` | `string` | `https://fastly.jsdelivr.net/npm/live2d-widgets@1/dist/waifu-tips.json` | Path to the widget resources, can be modified |
+| `waifuPath` | `string` | `https://fastly.jsdelivr.net/npm/live2d-widgets@1.0.1/dist/waifu-tips.json` | Path to the widget resources, can be modified |
 | `cdnPath` | `string` | `https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/` | CDN path |
-| `cubism2Path` | `string` | `https://fastly.jsdelivr.net/npm/live2d-widgets@1/dist/live2d.min.js` | Path to Cubism 2 Core |
+| `cubism2Path` | `string` | `https://fastly.jsdelivr.net/npm/live2d-widgets@1.0.1/dist/live2d.min.js` | Path to Cubism 2 Core |
 | `cubism5Path` | `string` | `https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js` | Path to Cubism 5 Core |
 | `modelId` | `number` | `0` | Default model id |
 | `tools` | `string[]` | see `autoload.js` | Buttons of the loaded tools |
 | `drag` | `boolean` | `false` | Make the widget draggable |
+| `showToggleAfterQuit` | `boolean` | `true` | Whether to show the toggle button after quitting; if `false`, quitting permanently disables the widget until local storage is cleared |
 | `logLevel` | `string` | `error` | Log level: `error`, `warn`, `info`, `trace` |
 
 ## Model Repository

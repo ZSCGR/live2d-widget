@@ -8,19 +8,23 @@
  */
 
 import logger from '../logger.js';
+import type { Live2DModelRuntime } from './types.js';
 //============================================================
 //============================================================
 //  class PlatformManager     extend IPlatformManager
 //============================================================
 //============================================================
 class PlatformManager {
+  private readonly cache: Record<string, ArrayBuffer>;
+  public texture?: WebGLTexture;
+
   constructor() {
     this.cache = {};
   }
   //============================================================
   //    PlatformManager # loadBytes()
   //============================================================
-  loadBytes(path /*String*/, callback) {
+  loadBytes(path: string, callback: (buf: ArrayBuffer) => void) {
     if (path in this.cache) {
       return callback(this.cache[path]);
     }
@@ -35,12 +39,12 @@ class PlatformManager {
   //============================================================
   //    PlatformManager # loadLive2DModel()
   //============================================================
-  loadLive2DModel(path /*String*/, callback) {
-    let model = null;
+  loadLive2DModel(path: string, callback: (model: Live2DModelRuntime) => void) {
+    let model: Live2DModelRuntime | null = null;
 
     // load moc
     this.loadBytes(path, buf => {
-      model = Live2DModelWebGL.loadModel(buf);
+      model = Live2DModelWebGL.loadModel(buf) as unknown as Live2DModelRuntime;
       callback(model);
     });
   }
@@ -48,7 +52,7 @@ class PlatformManager {
   //============================================================
   //    PlatformManager # loadTexture()
   //============================================================
-  loadTexture(model /*ALive2DModel*/, no /*int*/, path /*String*/, callback) {
+  loadTexture(model: Live2DModelRuntime, no: number, path: string, callback?: () => void) {
     // load textures
     const loadedImage = new Image();
     loadedImage.crossOrigin = 'anonymous';
@@ -56,9 +60,17 @@ class PlatformManager {
 
     loadedImage.onload = () => {
       // create texture
-      const canvas = document.getElementById('live2d');
+      const canvas = document.getElementById('live2d') as HTMLCanvasElement | null;
+      if (!canvas) {
+        logger.error('Canvas live2d not found.');
+        return -1;
+      }
       const gl = canvas.getContext('webgl2', { premultipliedAlpha: true, preserveDrawingBuffer: true });
-      let texture = gl.createTexture();
+      if (!gl) {
+        logger.error('Failed to create WebGL context.');
+        return -1;
+      }
+      const texture = gl.createTexture();
       if (!texture) {
         logger.error('Failed to generate gl texture name.');
         return -1;
@@ -89,9 +101,6 @@ class PlatformManager {
 
       model.setTexture(no, texture);
 
-      // テクスチャオブジェクトを解放
-      texture = null;
-
       if (typeof callback == 'function') callback();
     };
 
@@ -104,7 +113,7 @@ class PlatformManager {
   //    PlatformManager # parseFromBytes(buf)
 
   //============================================================
-  jsonParseFromBytes(buf) {
+  jsonParseFromBytes(buf: ArrayBuffer): unknown {
     let jsonStr;
 
     const bomCode = new Uint8Array(buf, 0, 3);
