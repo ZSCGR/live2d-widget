@@ -13,6 +13,7 @@
     "skipLibCheck": true,
     "removeComments": true,
     "allowJs": true,
+    "types": ["node"],
     "paths": {
       "@framework/*": [
         "./src/CubismSdkForWeb-5-r.4/Framework/src/*"
@@ -23,5 +24,10 @@
     }
   },
   "include": ["src"],
-  "exclude": ["node_modules", "build", "dist"]
+  "exclude": [
+    "node_modules",
+    "build",
+    "dist",
+    "src/CubismSdkForWeb-*/Samples/TypeScript/Demo/vite.config.mts"
+  ]
 }
