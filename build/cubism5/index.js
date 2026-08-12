@@ -126,7 +126,10 @@ export class AppDelegate extends LAppDelegate {
         const lapplive2dmanager = this._subdelegates.at(0).getLive2DManager();
         const { x, y } = this.transformOffset(e);
         const model = lapplive2dmanager._models.at(0);
-        if (model.hitTest(LAppDefine.HitAreaNameBody, x, y)) {
+        if (model.hitTest(LAppDefine.HitAreaNameHead, x, y)) {
+            window.dispatchEvent(new Event('live2d:taphead'));
+        }
+        else if (model.hitTest(LAppDefine.HitAreaNameBody, x, y)) {
             window.dispatchEvent(new Event('live2d:tapbody'));
         }
     }

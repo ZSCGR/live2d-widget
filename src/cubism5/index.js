@@ -209,7 +209,11 @@ export class AppDelegate extends LAppDelegate {
     const { x, y } = this.transformOffset(e);
     const model = lapplive2dmanager._models.at(0);
 
-    if (model.hitTest(LAppDefine.HitAreaNameBody, x, y)) {
+    // Head wins over body where the two areas overlap, so only one message
+    // is ever shown.
+    if (model.hitTest(LAppDefine.HitAreaNameHead, x, y)) {
+      window.dispatchEvent(new Event('live2d:taphead'));
+    } else if (model.hitTest(LAppDefine.HitAreaNameBody, x, y)) {
       window.dispatchEvent(new Event('live2d:tapbody'));
     }
   }

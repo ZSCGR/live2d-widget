@@ -188,7 +188,7 @@ class Cubism2Model {
         };
     }
     modelTurnHead(event) {
-        var _a;
+        var _a, _b;
         if (!this.canvas || !this.dragMgr)
             return;
         const rect = this.canvas.getBoundingClientRect();
@@ -209,7 +209,10 @@ class Cubism2Model {
             ')');
         this.dragMgr.setPoint(vx, vy);
         this.live2DMgr.tapEvent(x, y);
-        if ((_a = this.live2DMgr.model) === null || _a === void 0 ? void 0 : _a.hitTest(LAppDefine.HIT_AREA_BODY, x, y)) {
+        if ((_a = this.live2DMgr.model) === null || _a === void 0 ? void 0 : _a.hitTest(LAppDefine.HIT_AREA_HEAD, x, y)) {
+            window.dispatchEvent(new Event('live2d:taphead'));
+        }
+        else if ((_b = this.live2DMgr.model) === null || _b === void 0 ? void 0 : _b.hitTest(LAppDefine.HIT_AREA_BODY, x, y)) {
             window.dispatchEvent(new Event('live2d:tapbody'));
         }
     }

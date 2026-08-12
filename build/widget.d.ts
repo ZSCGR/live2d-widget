@@ -15,6 +15,7 @@ interface Tips {
         referrer: string;
         hoverBody: string | string[];
         tapBody: string | string[];
+        tapHead?: string | string[];
     };
     time: Time;
     mouseover: {

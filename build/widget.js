@@ -69,6 +69,12 @@ function registerEventListener(tips) {
         const text = randomSelection(tips.message.tapBody);
         showMessage(text, 4000, 9);
     });
+    window.addEventListener('live2d:taphead', () => {
+        if (!tips.message.tapHead)
+            return;
+        const text = randomSelection(tips.message.tapHead);
+        showMessage(text, 4000, 9);
+    });
     const devtools = () => { };
     console.log('%c', devtools);
     devtools.toString = () => {

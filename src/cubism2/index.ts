@@ -297,7 +297,11 @@ class Cubism2Model {
     this.dragMgr.setPoint(vx, vy);
     this.live2DMgr.tapEvent(x, y);
 
-    if (this.live2DMgr.model?.hitTest(LAppDefine.HIT_AREA_BODY, x, y)) {
+    // Head wins over body where the two areas overlap, matching the order
+    // tapEvent picks a motion in, so only one message is ever shown.
+    if (this.live2DMgr.model?.hitTest(LAppDefine.HIT_AREA_HEAD, x, y)) {
+      window.dispatchEvent(new Event('live2d:taphead'));
+    } else if (this.live2DMgr.model?.hitTest(LAppDefine.HIT_AREA_BODY, x, y)) {
       window.dispatchEvent(new Event('live2d:tapbody'));
     }
   }

@@ -47,6 +47,12 @@ interface Tips {
     referrer: string;
     hoverBody: string | string[];
     tapBody: string | string[];
+    /**
+     * Message shown when the head is tapped. Optional: a waifu-tips.json
+     * written before this existed simply shows nothing.
+     * @type {string | string[] | undefined}
+     */
+    tapHead?: string | string[];
   };
   /**
    * Time configuration.
@@ -153,6 +159,11 @@ function registerEventListener(tips: Tips) {
   });
   window.addEventListener('live2d:tapbody', () => {
     const text = randomSelection(tips.message.tapBody);
+    showMessage(text, 4000, 9);
+  });
+  window.addEventListener('live2d:taphead', () => {
+    if (!tips.message.tapHead) return;
+    const text = randomSelection(tips.message.tapHead);
     showMessage(text, 4000, 9);
   });
 
