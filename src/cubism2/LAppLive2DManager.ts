@@ -90,6 +90,17 @@ class LAppLive2DManager {
     }
   }
 
+  private startFirstAvailableMotion(names: string[]): boolean {
+    if (!this.model?.modelSetting) return false;
+
+    for (const name of names) {
+      if (this.model.modelSetting.getMotionNum(name) <= 0) continue;
+      this.model.startRandomMotion(name, LAppDefine.PRIORITY_NORMAL);
+      return true;
+    }
+    return false;
+  }
+
   tapEvent(x: number, y: number): boolean {
     logger.trace('tapEvent view x:' + x + ' y:' + y);
 
@@ -97,13 +108,21 @@ class LAppLive2DManager {
 
     if (this.model.hitTest(LAppDefine.HIT_AREA_HEAD, x, y)) {
       logger.trace('Tap face.');
-      this.model.setRandomExpression();
+      if (Object.keys(this.model.expressions).length > 0) {
+        this.model.setRandomExpression();
+      } else {
+        this.startFirstAvailableMotion([
+          LAppDefine.MOTION_GROUP_TAP_FACE,
+          LAppDefine.MOTION_GROUP_FLICK_HEAD,
+        ]);
+      }
     } else if (this.model.hitTest(LAppDefine.HIT_AREA_BODY, x, y)) {
       logger.trace('Tap body.');
-      this.model.startRandomMotion(
+      this.startFirstAvailableMotion([
         LAppDefine.MOTION_GROUP_TAP_BODY,
-        LAppDefine.PRIORITY_NORMAL,
-      );
+        LAppDefine.MOTION_GROUP_TAP_BREAST,
+        LAppDefine.MOTION_GROUP_TAP_BELLY,
+      ]);
     }
     return true;
   }

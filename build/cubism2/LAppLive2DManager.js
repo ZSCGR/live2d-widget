@@ -66,17 +66,41 @@ class LAppLive2DManager {
             this.model.startRandomMotion(LAppDefine.MOTION_GROUP_PINCH_OUT, LAppDefine.PRIORITY_NORMAL);
         }
     }
+    startFirstAvailableMotion(names) {
+        var _a;
+        if (!((_a = this.model) === null || _a === void 0 ? void 0 : _a.modelSetting))
+            return false;
+        for (const name of names) {
+            if (this.model.modelSetting.getMotionNum(name) <= 0)
+                continue;
+            this.model.startRandomMotion(name, LAppDefine.PRIORITY_NORMAL);
+            return true;
+        }
+        return false;
+    }
     tapEvent(x, y) {
         logger.trace('tapEvent view x:' + x + ' y:' + y);
         if (!this.model)
             return false;
         if (this.model.hitTest(LAppDefine.HIT_AREA_HEAD, x, y)) {
             logger.trace('Tap face.');
-            this.model.setRandomExpression();
+            if (Object.keys(this.model.expressions).length > 0) {
+                this.model.setRandomExpression();
+            }
+            else {
+                this.startFirstAvailableMotion([
+                    LAppDefine.MOTION_GROUP_TAP_FACE,
+                    LAppDefine.MOTION_GROUP_FLICK_HEAD,
+                ]);
+            }
         }
         else if (this.model.hitTest(LAppDefine.HIT_AREA_BODY, x, y)) {
             logger.trace('Tap body.');
-            this.model.startRandomMotion(LAppDefine.MOTION_GROUP_TAP_BODY, LAppDefine.PRIORITY_NORMAL);
+            this.startFirstAvailableMotion([
+                LAppDefine.MOTION_GROUP_TAP_BODY,
+                LAppDefine.MOTION_GROUP_TAP_BREAST,
+                LAppDefine.MOTION_GROUP_TAP_BELLY,
+            ]);
         }
         return true;
     }

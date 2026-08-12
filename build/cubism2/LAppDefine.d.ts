@@ -12,7 +12,10 @@ declare const LAppDefine: {
     PRIORITY_NORMAL: number;
     PRIORITY_FORCE: number;
     MOTION_GROUP_IDLE: string;
+    MOTION_GROUP_TAP_FACE: string;
     MOTION_GROUP_TAP_BODY: string;
+    MOTION_GROUP_TAP_BREAST: string;
+    MOTION_GROUP_TAP_BELLY: string;
     MOTION_GROUP_FLICK_HEAD: string;
     MOTION_GROUP_PINCH_IN: string;
     MOTION_GROUP_PINCH_OUT: string;

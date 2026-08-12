@@ -16,7 +16,10 @@ const LAppDefine = {
   PRIORITY_FORCE: 3,
 
   MOTION_GROUP_IDLE: 'idle',
+  MOTION_GROUP_TAP_FACE: 'tap_face',
   MOTION_GROUP_TAP_BODY: 'tap_body',
+  MOTION_GROUP_TAP_BREAST: 'tap_breast',
+  MOTION_GROUP_TAP_BELLY: 'tap_belly',
   MOTION_GROUP_FLICK_HEAD: 'flick_head',
   MOTION_GROUP_PINCH_IN: 'pinch_in',
   MOTION_GROUP_PINCH_OUT: 'pinch_out',
