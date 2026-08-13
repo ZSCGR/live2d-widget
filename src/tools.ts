@@ -51,7 +51,7 @@ class ToolsManager {
         icon: fa_comment,
         callback: async () => {
           // Add hitokoto.cn API
-          const response = await fetch('https://v1.hitokoto.cn');
+          const response = await fetch('https://yiyan.chgr.cc/');
           const result = await response.json();
           const template = tips.message.hitokoto;
           const text = i18n(template, result.from, result.creator);

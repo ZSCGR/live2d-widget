@@ -245,14 +245,25 @@ class ModelManager {
             showMessage(failMessage, 4000, 10);
         }
         else {
-            await this.loadModel(successMessage);
+            let message = successMessage;
+            if (this.useCDN && this.modelList) {
+                const welcomeMsg = this.modelList.messages[modelId];
+                if (Array.isArray(welcomeMsg)) {
+                    message = welcomeMsg[this.modelTexturesId];
+                }
+            }
+            await this.loadModel(message);
         }
     }
     async loadNextModel() {
         this.modelTexturesId = 0;
         if (this.useCDN) {
             this.modelId = (this.modelId + 1) % this.modelList.models.length;
-            await this.loadModel(this.modelList.messages[this.modelId]);
+            let message = this.modelList.messages[this.modelId];
+            if (Array.isArray(message)) {
+                message = message[this.modelTexturesId];
+            }
+            await this.loadModel(message);
         }
         else {
             this.modelId = (this.modelId + 1) % this.models.length;

@@ -212,7 +212,7 @@ window.addEventListener("load", () => {
 	}
 
 	document.getElementById("info").addEventListener("click", () => {
-		fetch("https://v1.hitokoto.cn")
+		fetch("https://yiyan.chgr.cc/")
 			.then(response => response.json())
 			.then(result => {
 				alert("「" + result.hitokoto + "」——" + result.from);

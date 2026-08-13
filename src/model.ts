@@ -10,8 +10,8 @@ import type { AppDelegate as Cubism5Model } from './cubism5/index.js';
 import logger, { LogLevel } from './logger.js';
 
 interface ModelListCDN {
-  messages: string[];
-  models: string | string[];
+  messages: (string | string[])[];
+  models: (string | string[])[];
 }
 
 interface ModelList {
@@ -341,7 +341,14 @@ class ModelManager {
     if (noTextureAvailable) {
       showMessage(failMessage, 4000, 10);
     } else {
-      await this.loadModel(successMessage);
+      let message = successMessage;
+      if (this.useCDN && this.modelList) {
+        const welcomeMsg = this.modelList.messages[modelId];
+        if (Array.isArray(welcomeMsg)) {
+          message = welcomeMsg[this.modelTexturesId];
+        }
+      }
+      await this.loadModel(message);
     }
   }
 
@@ -352,7 +359,11 @@ class ModelManager {
     this.modelTexturesId = 0;
     if (this.useCDN) {
       this.modelId = (this.modelId + 1) % this.modelList.models.length;
-      await this.loadModel(this.modelList.messages[this.modelId]);
+      let message = this.modelList.messages[this.modelId];
+      if (Array.isArray(message)) {
+        message = message[this.modelTexturesId];
+      }
+      await this.loadModel(message);
     } else {
       this.modelId = (this.modelId + 1) % this.models.length;
       await this.loadModel(this.models[this.modelId].message);
