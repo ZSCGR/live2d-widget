@@ -30,7 +30,7 @@ You can also check out example web pages:
 If you are a beginner or only need the basic functionality, you can simply add the following line of code to the `head` or `body` of your HTML page to load the widget:
 
 ```html
-<script src="https://fastly.jsdelivr.net/npm/live2d-widgets@1.0.1/dist/autoload.js"></script>
+<script src="https://fastly.jsdelivr.net/gh/ZSCGR/live2d-widget@1.0.1/dist/autoload.js"></script>
 ```
 
 The placement of the code depends on how your website is built. For example, if you are using [Hexo](https://hexo.io), you need to add the above code to the template file of your theme. The modification process is similar for pages generated using various template engines.  
@@ -45,8 +45,8 @@ You can refer to the source code of `dist/autoload.js` to see the available conf
 
 | Option | Type | Default Value | Description |
 | ------ | ---- | ------------- | ----------- |
-| `waifuPath` | `string` | `https://fastly.jsdelivr.net/npm/live2d-widgets@1.0.1/dist/waifu-tips.json` | Path to the widget resources, can be modified |
-| `cdnPath` | `string` | `https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/` | CDN path |
+| `waifuPath` | `string` | `https://fastly.jsdelivr.net/gh/ZSCGR/live2d-widget@1.0.1/dist/waifu-tips.json` | Path to the widget resources, can be modified |
+| `cdnPath` | `string` | `https://api-live2d.chgr.cc/` | CDN path |
 | `cubism2Path` | `string` | `dist/live2d.min.js` | Path to Cubism 2 Core |
 | `cubism5Path` | `string` | `dist/live2dcubismcore.min.js` | Path to Cubism 5 Core |
 | `modelId` | `number` | `0` | Default model id |
@@ -77,7 +77,7 @@ If the options provided in the "Configuration" section above are not enough to m
 To deploy the development testing environment of this project locally, you need to install Node.js and npm, then execute the following commands:
 
 ```bash
-git clone https://github.com/stevenjoezhang/live2d-widget.git
+git clone https://github.com/ZSCGR/live2d-widget.git
 npm install
 ```
 
