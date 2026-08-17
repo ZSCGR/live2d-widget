@@ -607,6 +607,8 @@ class L2DPose {
         const ret = new L2DPose();
         const pm = Live2DFramework.getPlatformManager();
         const json = pm.jsonParseFromBytes(buf);
+        if (!json || !json.parts_visible)
+            return null;
         const poseListInfo = json.parts_visible;
         const poseNum = poseListInfo.length;
         for (let i_pose = 0; i_pose < poseNum; i_pose++) {

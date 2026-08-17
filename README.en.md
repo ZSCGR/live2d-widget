@@ -47,8 +47,8 @@ You can refer to the source code of `dist/autoload.js` to see the available conf
 | ------ | ---- | ------------- | ----------- |
 | `waifuPath` | `string` | `https://fastly.jsdelivr.net/npm/live2d-widgets@1.0.1/dist/waifu-tips.json` | Path to the widget resources, can be modified |
 | `cdnPath` | `string` | `https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/` | CDN path |
-| `cubism2Path` | `string` | `https://fastly.jsdelivr.net/npm/live2d-widgets@1.0.1/dist/live2d.min.js` | Path to Cubism 2 Core |
-| `cubism5Path` | `string` | `https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js` | Path to Cubism 5 Core |
+| `cubism2Path` | `string` | `dist/live2d.min.js` | Path to Cubism 2 Core |
+| `cubism5Path` | `string` | `dist/live2dcubismcore.min.js` | Path to Cubism 5 Core |
 | `modelId` | `number` | `0` | Default model id |
 | `tools` | `string[]` | see `autoload.js` | Buttons of the loaded tools |
 | `drag` | `boolean` | `false` | Make the widget draggable |

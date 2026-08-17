@@ -47,8 +47,8 @@
 | - | - | - | - |
 | `waifuPath` | `string` | `https://fastly.jsdelivr.net/npm/live2d-widgets@1.0.1/dist/waifu-tips.json` | 看板娘资源路径，可自行修改 |
 | `cdnPath` | `string` | `https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/` | CDN 路径 |
-| `cubism2Path` | `string` | `https://fastly.jsdelivr.net/npm/live2d-widgets@1.0.1/dist/live2d.min.js` | Cubism 2 Core 路径 |
-| `cubism5Path` | `string` | `https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js` | Cubism 5 Core 路径 |
+| `cubism2Path` | `string` | `dist/live2d.min.js` | Cubism 2 Core 路径 |
+| `cubism5Path` | `string` | `dist/live2dcubismcore.min.js` | Cubism 5 Core 路径 |
 | `modelId` | `number` | `0` | 默认模型 id |
 | `tools` | `string[]` | 见 `autoload.js` | 加载的小工具按钮 |
 | `drag` | `boolean` | `false` | 支持拖动看板娘 |

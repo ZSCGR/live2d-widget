@@ -90,6 +90,8 @@ class PlatformManager {
         };
     }
     jsonParseFromBytes(buf) {
+        if (!buf || buf.byteLength === 0)
+            return null;
         let jsonStr;
         const bomCode = new Uint8Array(buf, 0, 3);
         if (bomCode[0] == 239 && bomCode[1] == 187 && bomCode[2] == 191) {
@@ -98,8 +100,12 @@ class PlatformManager {
         else {
             jsonStr = String.fromCharCode.apply(null, new Uint8Array(buf));
         }
-        const jsonObj = JSON.parse(jsonStr);
-        return jsonObj;
+        try {
+            return JSON.parse(jsonStr);
+        }
+        catch (e) {
+            return null;
+        }
     }
 }
 export default PlatformManager;

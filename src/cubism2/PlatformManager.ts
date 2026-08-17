@@ -163,6 +163,7 @@ class PlatformManager {
 
   //============================================================
   jsonParseFromBytes(buf: ArrayBuffer): unknown {
+    if (!buf || buf.byteLength === 0) return null;
     let jsonStr;
 
     const bomCode = new Uint8Array(buf, 0, 3);
@@ -172,9 +173,11 @@ class PlatformManager {
       jsonStr = String.fromCharCode.apply(null, new Uint8Array(buf));
     }
 
-    const jsonObj = JSON.parse(jsonStr);
-
-    return jsonObj;
+    try {
+      return JSON.parse(jsonStr);
+    } catch (e) {
+      return null;
+    }
   }
 }
 
