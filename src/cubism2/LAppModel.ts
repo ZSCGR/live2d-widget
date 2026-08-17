@@ -1,4 +1,4 @@
-/* global UtSystem, document */
+/* global UtSystem */
 import { L2DBaseModel, Live2DFramework, L2DEyeBlink } from './Live2DFramework.js';
 import ModelSettingJson from './utils/ModelSettingJson.js';
 import LAppDefine from './LAppDefine.js';
@@ -64,14 +64,24 @@ class LAppModel extends L2DBaseModel {
     const modelSetting = this.modelSetting;
     if (!modelSetting) return;
     const path = this.modelHomeDir + modelSetting.getModelFile();
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     this.loadModelData(path, model => {
-      for (let i = 0; i < modelSetting.getTextureNum(); i++) {
+      const totalTextures = modelSetting.getTextureNum();
+      let loadedTextures = 0;
+      if (totalTextures === 0) {
+        this.setUpdating(false);
+        this.setInitialized(true);
+        if (typeof callback == 'function') callback();
+        return;
+      }
+
+      for (let i = 0; i < totalTextures; i++) {
         const texPaths =
           this.modelHomeDir + modelSetting.getTextureFile(i);
 
         this.loadTexture(i, texPaths, () => {
-          if (this.isTexLoaded) {
+          loadedTextures++;
+          if (loadedTextures >= totalTextures) {
+            this.isTexLoaded = true;
             if (modelSetting.getExpressionNum() > 0) {
               this.expressions = {};
 
@@ -157,7 +167,19 @@ class LAppModel extends L2DBaseModel {
             }
 
             this.live2DModel.saveParam();
-            // this.live2DModel.setGL(gl);
+            const canvas = document.getElementById('live2d') as HTMLCanvasElement;
+            if (canvas) {
+              const gl = canvas.getContext('webgl2', {
+                premultipliedAlpha: true,
+                preserveDrawingBuffer: true,
+              });
+              if (gl) Live2D.setGL(gl);
+            }
+            try {
+              this.live2DModel.update();
+            } catch (e) {
+              logger.warn('Initial live2DModel update error:', e);
+            }
 
             this.preloadMotionGroup(LAppDefine.MOTION_GROUP_IDLE);
             this.mainMotionManager.stopAllMotions();
@@ -203,10 +225,37 @@ class LAppModel extends L2DBaseModel {
   }
 
   release(gl: WebGL2RenderingContext) {
-    // this.live2DModel.deleteTextures();
-    const pm = Live2DFramework.getPlatformManager();
+    (this as any)._isReleased = true;
+    
+    // Reset motion manager to allow immediate new motion
+    // This prevents being blocked by fade-out of previous motion
+    this.mainMotionManager.setReservePriority(0);
+    
+    // Stop any playing audio before releasing the model
+    if ((this as any)._currentAudio) {
+      const audio = (this as any)._currentAudio;
+      audio.pause();
+      audio.currentTime = 0;
+      audio.src = ''; // Force release of audio resource
+      (this as any)._currentAudio = null;
+    }
 
-    gl.deleteTexture(pm.texture);
+    // Clear motion cache to prevent old model motions from being reused
+    // Motion keys like "tap_body_0" can be the same across different models,
+    // but they contain model-specific data
+    for (const key of Object.keys(this.motions)) {
+      delete this.motions[key];
+    }
+    for (const key of Object.keys(this.expressions)) {
+      delete this.expressions[key];
+    }
+
+    if (gl && Array.isArray((this as any).textures)) {
+      for (const tex of (this as any).textures) {
+        gl.deleteTexture(tex);
+      }
+    }
+    (this as any).textures = [];
   }
 
   preloadMotionGroup(name: string) {
@@ -215,14 +264,21 @@ class LAppModel extends L2DBaseModel {
     for (let i = 0; i < modelSetting.getMotionNum(name); i++) {
       const file = modelSetting.getMotionFile(name, i);
       this.loadMotion(file, this.modelHomeDir + file, motion => {
-        motion.setFadeIn(modelSetting.getMotionFadeIn(name, i));
-        motion.setFadeOut(modelSetting.getMotionFadeOut(name, i));
+        if (motion) {
+          motion.setFadeIn(modelSetting.getMotionFadeIn(name, i));
+          motion.setFadeOut(modelSetting.getMotionFadeOut(name, i));
+        }
       });
     }
   }
 
   update() {
     // logger.trace("--> LAppModel.update()");
+    
+    // Check if this model was released
+    if ((this as any)._isReleased) {
+      return;
+    }
 
     if (this.live2DModel == null) {
       logger.error('Failed to update.');
@@ -230,12 +286,16 @@ class LAppModel extends L2DBaseModel {
       return;
     }
 
+    if (!this.startTimeMSec) {
+      this.startTimeMSec = UtSystem.getUserTimeMSec();
+    }
+
     const timeMSec = UtSystem.getUserTimeMSec() - this.startTimeMSec;
     const timeSec = timeMSec / 1000.0;
     const t = timeSec * 2 * Math.PI;
 
     if (this.mainMotionManager.isFinished()) {
-      this.startRandomMotion(
+      this.startNextMotion(
         LAppDefine.MOTION_GROUP_IDLE,
         LAppDefine.PRIORITY_IDLE,
       );
@@ -251,8 +311,6 @@ class LAppModel extends L2DBaseModel {
         this.eyeBlink.updateParam(this.live2DModel);
       }
     }
-
-    this.live2DModel.saveParam();
 
     //-----------------------------------------------------------------
 
@@ -329,10 +387,22 @@ class LAppModel extends L2DBaseModel {
     this.setExpression(tmp[no]);
   }
 
-  startRandomMotion(name: string, priority: number) {
-    if (!this.modelSetting) return;
+  /** Motions rotate in order rather than at random, so repeated taps on the
+   *  same area walk through the group instead of repeating one entry. */
+  startNextMotion(name: string, priority: number) {
+    if (!this.modelSetting) {
+      // Clean up reservePriority to prevent blocking subsequent motions
+      this.mainMotionManager.setReservePriority(0);
+      return;
+    }
     const max = this.modelSetting.getMotionNum(name);
-    const no = Math.floor(Math.random() * max);
+    if (max <= 0) return;
+    (this as any)._lastMotionIndexes = (this as any)._lastMotionIndexes || {};
+    const lastIdx = (this as any)._lastMotionIndexes[name] !== undefined
+      ? (this as any)._lastMotionIndexes[name]
+      : -1;
+    const no = (lastIdx + 1) % max;
+    (this as any)._lastMotionIndexes[name] = no;
     this.startMotion(name, no, priority);
   }
 
@@ -352,23 +422,42 @@ class LAppModel extends L2DBaseModel {
       return;
     }
 
-    let motion;
+    const motionText = this.modelSetting.getMotionText?.(name, no);
+    if (motionText) {
+      window.dispatchEvent(
+        new CustomEvent('live2d:showmessage', {
+          detail: { text: motionText, duration: 5000, priority: 12 },
+        })
+      );
+    }
 
-    if (this.motions[name] == null) {
+    const motionKey = `${name}_${no}`;
+    if (this.motions[motionKey] == null) {
       this.loadMotion(null, this.modelHomeDir + motionName, mtn => {
-        motion = mtn;
-
-        this.setFadeInFadeOut(name, no, priority, motion);
+        if (!mtn) {
+          // Motion failed to load (stale response), clean up reservePriority
+          this.mainMotionManager.setReservePriority(0);
+          return;
+        }
+        this.motions[motionKey] = mtn;
+        this.setFadeInFadeOut(name, no, priority, mtn);
       });
     } else {
-      motion = this.motions[name];
-
-      this.setFadeInFadeOut(name, no, priority, motion);
+      this.setFadeInFadeOut(name, no, priority, this.motions[motionKey]);
     }
   }
 
-  setFadeInFadeOut(name: string, no: number, priority: number, motion: Motion) {
-    if (!this.modelSetting) return;
+  setFadeInFadeOut(name: string, no: number, priority: number, motion: Motion | null) {
+    if (!motion) {
+      // Motion is null, clean up reservePriority
+      this.mainMotionManager.setReservePriority(0);
+      return;
+    }
+    if (!this.modelSetting) {
+      // Clean up reservePriority to prevent blocking subsequent motions
+      this.mainMotionManager.setReservePriority(0);
+      return;
+    }
     const motionName = this.modelSetting.getMotionFile(name, no);
 
     motion.setFadeIn(this.modelSetting.getMotionFadeIn(name, no));
@@ -380,14 +469,27 @@ class LAppModel extends L2DBaseModel {
       this.mainMotionManager.startMotionPrio(motion, priority);
     } else {
       const soundName = this.modelSetting.getMotionSound(name, no);
-      // var player = new Sound(this.modelHomeDir + soundName);
 
-      const snd = document.createElement('audio');
-      snd.src = this.modelHomeDir + soundName;
-
-      logger.trace('Start sound : ' + soundName);
-
-      snd.play();
+      try {
+        if ((this as any)._currentAudio) {
+          (this as any)._currentAudio.pause();
+          (this as any)._currentAudio = null;
+        }
+        const audioPath = this.modelHomeDir + soundName;
+        // Add cache buster to prevent browser from caching audio across model switches
+        const cacheBustedPath =
+          audioPath + (audioPath.includes('?') ? '&' : '?') + '_cb=' + Date.now();
+        const snd = new Audio(cacheBustedPath);
+        (this as any)._currentAudio = snd;
+        logger.trace('Start sound : ' + soundName);
+        snd.play().catch(e => {
+          if (e.name !== 'AbortError') {
+            logger.warn('[Live2D Widget] Audio play skipped:', e.message);
+          }
+        });
+      } catch (e) {
+        logger.warn('[Live2D Widget] Audio creation failed:', e);
+      }
       this.mainMotionManager.startMotionPrio(motion, priority);
     }
   }
@@ -402,9 +504,8 @@ class LAppModel extends L2DBaseModel {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   draw(gl: WebGL2RenderingContext) {
-    //logger.trace("--> LAppModel.draw()");
-
-    // if(this.live2DModel == null) return;
+    if ((this as any)._isReleased) return;
+    if (!this.live2DModel || !this.isInitialized() || this.isUpdating()) return;
 
     MatrixStack.push();
 
@@ -417,25 +518,45 @@ class LAppModel extends L2DBaseModel {
     MatrixStack.pop();
   }
 
-  hitTest(id: string, testX: number, testY: number): boolean {
-    const len = this.modelSetting.getHitAreaNum();
-    if (len == 0) {
-      const hitAreasCustom = this.modelSetting.getHitAreaCustom();
-      if (hitAreasCustom) {
-        const x = hitAreasCustom[id + '_x'];
-        const y = hitAreasCustom[id + '_y'];
+  /**
+   * Area names this model declares, hand-drawn rectangles first so that the
+   * search order matches the priority hitTest applies.
+   */
+  declaredHitAreas(): string[] {
+    if (!this.modelSetting) return [];
 
-        if (testX > Math.min(...x) && testX < Math.max(...x) &&
-            testY > Math.min(...y) && testY < Math.max(...y)) {
-          return true;
-        }
-      }
+    const names: string[] = [];
+    const custom = this.modelSetting.getHitAreaCustom();
+    for (const key of Object.keys(custom || {})) {
+      if (!key.endsWith('_x')) continue;
+      const name = key.slice(0, -2);
+      if (!names.includes(name)) names.push(name);
     }
-    for (let i = 0; i < len; i++) {
-      if (id == this.modelSetting.getHitAreaName(i)) {
-        const drawID = this.modelSetting.getHitAreaID(i);
+    for (let i = 0; i < this.modelSetting.getHitAreaNum(); i++) {
+      const name = this.modelSetting.getHitAreaName(i);
+      if (name && !names.includes(name)) names.push(name);
+    }
+    return names;
+  }
 
-        return this.hitTestSimple(drawID, testX, testY);
+  /**
+   * A hand-drawn rectangle takes priority over the model's own drawable for
+   * the same area name, and replaces it rather than adding to it: the point
+   * of drawing one is that the drawable was wrong there.
+   */
+  hitTest(id: string, testX: number, testY: number): boolean {    const custom = this.modelSetting.getHitAreaCustom();
+    const x = custom?.[id + '_x'];
+    const y = custom?.[id + '_y'];
+    if (x && y) {
+      return testX > Math.min(...x) && testX < Math.max(...x) &&
+             testY > Math.min(...y) && testY < Math.max(...y);
+    }
+
+    const len = this.modelSetting.getHitAreaNum();
+    for (let i = 0; i < len; i++) {
+      if (id !== this.modelSetting.getHitAreaName(i)) continue;
+      if (this.hitTestSimple(this.modelSetting.getHitAreaID(i), testX, testY)) {
+        return true;
       }
     }
 

@@ -1,10 +1,27 @@
 import { showMessage } from './message.js';
-import { loadExternalResource, randomOtherOption } from './utils.js';
+import { loadExternalResource } from './utils.js';
 import logger from './logger.js';
+let globalAudio = null;
+export function stopGlobalAudio() {
+    if (globalAudio) {
+        globalAudio.pause();
+        globalAudio.currentTime = 0;
+        globalAudio = null;
+    }
+}
+export function registerGlobalAudio(audio) {
+    stopGlobalAudio();
+    globalAudio = audio;
+}
+if (typeof window !== 'undefined') {
+    window.live2dStopAudio = stopGlobalAudio;
+    window.live2dRegisterAudio = registerGlobalAudio;
+}
 class ModelManager {
     constructor(config, models = []) {
         var _a;
         this.modelList = null;
+        this.currentModelSetting = null;
         let { apiPath, cdnPath } = config;
         const { cubism2Path, cubism5Path } = config;
         let useCDN = false;
@@ -43,36 +60,52 @@ class ModelManager {
         this.models = models;
     }
     static async initCheck(config, models = []) {
+        var _a, _b, _c;
         const model = new ModelManager(config, models);
         if (model.useCDN) {
-            const response = await fetch(`${model.cdnPath}model_list.json`);
-            model.modelList = await response.json();
-            if (model.modelId >= model.modelList.models.length) {
+            try {
+                const response = await fetch(`${model.cdnPath}model_list.json?_t=${Date.now()}`);
+                model.modelList = await response.json();
+            }
+            catch (_d) {
+                model.modelList = { models: [], messages: [] };
+            }
+            if (!Array.isArray((_a = model.modelList) === null || _a === void 0 ? void 0 : _a.models) || model.modelList.models.length === 0) {
+                return model;
+            }
+            if (model.modelId >= model.modelList.models.length || model.modelId < 0 || isNaN(model.modelId)) {
                 model.modelId = 0;
             }
-            const modelName = model.modelList.models[model.modelId];
+            let modelName = model.modelList.models[model.modelId];
             if (Array.isArray(modelName)) {
-                if (model.modelTexturesId >= modelName.length) {
+                if (model.modelTexturesId >= modelName.length || model.modelTexturesId < 0 || isNaN(model.modelTexturesId)) {
                     model.modelTexturesId = 0;
                 }
+                modelName = modelName[model.modelTexturesId];
             }
-            else {
+            if (modelName) {
                 const modelSettingPath = `${model.cdnPath}model/${modelName}/index.json`;
                 const modelSetting = await model.fetchWithCache(modelSettingPath);
-                const version = model.checkModelVersion(modelSetting);
-                if (version === 2) {
-                    const textureCache = await model.loadTextureCache(modelName);
-                    if (model.modelTexturesId >= textureCache.length) {
-                        model.modelTexturesId = 0;
+                if (modelSetting) {
+                    const version = model.checkModelVersion(modelSetting);
+                    if (version === 2) {
+                        const textureCache = await model.loadTextureCache(modelName);
+                        if (textureCache && model.modelTexturesId >= textureCache.length) {
+                            model.modelTexturesId = 0;
+                        }
                     }
                 }
             }
+            else {
+                model.modelId = 0;
+                model.modelTexturesId = 0;
+            }
         }
         else {
-            if (model.modelId >= model.models.length) {
+            if (model.modelId >= model.models.length || model.modelId < 0 || isNaN(model.modelId)) {
                 model.modelId = 0;
             }
-            if (model.modelTexturesId >= model.models[model.modelId].paths.length) {
+            if (model.modelTexturesId >= (((_c = (_b = model.models[model.modelId]) === null || _b === void 0 ? void 0 : _b.paths) === null || _c === void 0 ? void 0 : _c.length) || 1) || model.modelTexturesId < 0 || isNaN(model.modelTexturesId)) {
                 model.modelTexturesId = 0;
             }
         }
@@ -102,8 +135,14 @@ class ModelManager {
         }
         else {
             try {
-                const response = await fetch(url);
-                result = await response.json();
+                const fetchUrl = url + (url.includes('?') ? '&' : '?') + `_t=${Date.now()}`;
+                const response = await fetch(fetchUrl);
+                if (!response.ok) {
+                    result = null;
+                }
+                else {
+                    result = await response.json();
+                }
             }
             catch (_a) {
                 result = null;
@@ -113,30 +152,45 @@ class ModelManager {
         return result;
     }
     checkModelVersion(modelSetting) {
+        if (!modelSetting)
+            return 2;
         if (modelSetting.Version === 3 || modelSetting.FileReferences) {
             return 3;
         }
         return 2;
     }
+    hitAreasAt(clientX, clientY) {
+        const model = this.currentModelVersion === 3 ? this.cubism5model : this.cubism2model;
+        if (!model || typeof model.hitAreasAt !== 'function')
+            return null;
+        try {
+            return model.hitAreasAt(clientX, clientY);
+        }
+        catch (_a) {
+            return null;
+        }
+    }
     async loadLive2D(modelSettingPath, modelSetting) {
+        var _a;
         if (this.loading) {
             logger.warn('Still loading. Abort.');
             return;
         }
         this.loading = true;
+        this.currentModelSetting = modelSetting;
         try {
             const version = this.checkModelVersion(modelSetting);
             if (version === 2) {
+                if (!this.cubism2Path) {
+                    logger.error('No cubism2Path set, cannot load Cubism 2 Core.');
+                    return;
+                }
+                await loadExternalResource(this.cubism2Path, 'js');
+                const { default: Cubism2Model } = await import('./cubism2/index.js');
                 if (!this.cubism2model) {
-                    if (!this.cubism2Path) {
-                        logger.error('No cubism2Path set, cannot load Cubism 2 Core.');
-                        return;
-                    }
-                    await loadExternalResource(this.cubism2Path, 'js');
-                    const { default: Cubism2Model } = await import('./cubism2/index.js');
                     this.cubism2model = new Cubism2Model();
                 }
-                if (this.currentModelVersion === 3) {
+                if (this.cubism5model && this.currentModelVersion === 3) {
                     this.cubism5model.release();
                     this.resetCanvas();
                 }
@@ -154,12 +208,14 @@ class ModelManager {
                 }
                 await loadExternalResource(this.cubism5Path, 'js');
                 const { AppDelegate: Cubism5Model } = await import('./cubism5/index.js');
-                this.cubism5model = new Cubism5Model();
+                if (!this.cubism5model || this.currentModelVersion === 2) {
+                    this.cubism5model = new Cubism5Model();
+                }
                 if (this.currentModelVersion === 2) {
                     this.cubism2model.destroy();
                     this.resetCanvas();
                 }
-                if (this.currentModelVersion === 2 || !this.cubism5model.subdelegates.at(0)) {
+                if (this.currentModelVersion === 2 || !((_a = this.cubism5model.subdelegates) === null || _a === void 0 ? void 0 : _a.at(0))) {
                     this.cubism5model.initialize();
                     this.cubism5model.changeModel(modelSettingPath);
                     this.cubism5model.run();
@@ -180,20 +236,42 @@ class ModelManager {
         const textureCache = await this.fetchWithCache(`${this.cdnPath}model/${modelName}/textures.cache`);
         return textureCache || [];
     }
-    async loadModel(message) {
+    async loadModel(message = '') {
+        var _a, _b;
+        stopGlobalAudio();
         let modelSettingPath, modelSetting;
         if (this.useCDN) {
+            if (!((_b = (_a = this.modelList) === null || _a === void 0 ? void 0 : _a.models) === null || _b === void 0 ? void 0 : _b.length))
+                return;
+            if (this.modelId >= this.modelList.models.length || this.modelId < 0 || isNaN(this.modelId)) {
+                this.modelId = 0;
+            }
             let modelName = this.modelList.models[this.modelId];
             if (Array.isArray(modelName)) {
+                if (this.modelTexturesId >= modelName.length || this.modelTexturesId < 0 || isNaN(this.modelTexturesId)) {
+                    this.modelTexturesId = 0;
+                }
                 modelName = modelName[this.modelTexturesId];
             }
+            if (!modelName) {
+                this.modelId = 0;
+                modelName = this.modelList.models[0];
+                if (Array.isArray(modelName))
+                    modelName = modelName[0];
+            }
+            if (!modelName)
+                return;
             modelSettingPath = `${this.cdnPath}model/${modelName}/index.json`;
             modelSetting = await this.fetchWithCache(modelSettingPath);
+            if (!modelSetting) {
+                logger.error(`Failed to load model setting from ${modelSettingPath}`);
+                return;
+            }
             const version = this.checkModelVersion(modelSetting);
             if (version === 2) {
                 const textureCache = await this.loadTextureCache(modelName);
-                if (textureCache.length > 0) {
-                    let textures = textureCache[this.modelTexturesId];
+                if (textureCache && textureCache.length > 0) {
+                    let textures = textureCache[this.modelTexturesId % textureCache.length];
                     if (typeof textures === 'string')
                         textures = [textures];
                     modelSetting.textures = textures;
@@ -201,11 +279,21 @@ class ModelManager {
             }
         }
         else {
+            if (this.modelId >= this.models.length || this.modelId < 0 || isNaN(this.modelId)) {
+                this.modelId = 0;
+            }
+            if (!this.models[this.modelId])
+                return;
+            if (this.modelTexturesId >= this.models[this.modelId].paths.length || this.modelTexturesId < 0 || isNaN(this.modelTexturesId)) {
+                this.modelTexturesId = 0;
+            }
             modelSettingPath = this.models[this.modelId].paths[this.modelTexturesId];
             modelSetting = await this.fetchWithCache(modelSettingPath);
         }
-        await this.loadLive2D(modelSettingPath, modelSetting);
-        showMessage(message, 4000, 10);
+        if (modelSetting) {
+            await this.loadLive2D(modelSettingPath, modelSetting);
+            showMessage(message, 4000, 10);
+        }
     }
     async loadRandTexture(successMessage = '', failMessage = '') {
         const { modelId } = this;
@@ -213,7 +301,7 @@ class ModelManager {
         if (this.useCDN) {
             const modelName = this.modelList.models[modelId];
             if (Array.isArray(modelName)) {
-                this.modelTexturesId = randomOtherOption(modelName.length, this.modelTexturesId);
+                this.modelTexturesId = (this.modelTexturesId + 1) % modelName.length;
             }
             else {
                 const modelSettingPath = `${this.cdnPath}model/${modelName}/index.json`;
@@ -225,7 +313,7 @@ class ModelManager {
                         noTextureAvailable = true;
                     }
                     else {
-                        this.modelTexturesId = randomOtherOption(textureCache.length, this.modelTexturesId);
+                        this.modelTexturesId = (this.modelTexturesId + 1) % textureCache.length;
                     }
                 }
                 else {
@@ -238,7 +326,7 @@ class ModelManager {
                 noTextureAvailable = true;
             }
             else {
-                this.modelTexturesId = randomOtherOption(this.models[modelId].paths.length, this.modelTexturesId);
+                this.modelTexturesId = (this.modelTexturesId + 1) % this.models[modelId].paths.length;
             }
         }
         if (noTextureAvailable) {
@@ -256,6 +344,7 @@ class ModelManager {
         }
     }
     async loadNextModel() {
+        stopGlobalAudio();
         this.modelTexturesId = 0;
         if (this.useCDN) {
             this.modelId = (this.modelId + 1) % this.modelList.models.length;
@@ -267,6 +356,22 @@ class ModelManager {
         }
         else {
             this.modelId = (this.modelId + 1) % this.models.length;
+            await this.loadModel(this.models[this.modelId].message);
+        }
+    }
+    async loadPrevModel() {
+        stopGlobalAudio();
+        this.modelTexturesId = 0;
+        if (this.useCDN) {
+            this.modelId = (this.modelId - 1 + this.modelList.models.length) % this.modelList.models.length;
+            let message = this.modelList.messages[this.modelId];
+            if (Array.isArray(message)) {
+                message = message[this.modelTexturesId];
+            }
+            await this.loadModel(message);
+        }
+        else {
+            this.modelId = (this.modelId - 1 + this.models.length) % this.models.length;
             await this.loadModel(this.models[this.modelId].message);
         }
     }

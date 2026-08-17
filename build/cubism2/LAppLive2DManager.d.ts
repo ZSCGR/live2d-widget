@@ -12,6 +12,10 @@ declare class LAppLive2DManager {
     maxScaleEvent(): void;
     minScaleEvent(): void;
     private startFirstAvailableMotion;
-    tapEvent(x: number, y: number): boolean;
+    tapEvent(x: number, y: number): {
+        area: string;
+        hasOwnLine: boolean;
+        spoke: boolean;
+    } | null;
 }
 export default LAppLive2DManager;

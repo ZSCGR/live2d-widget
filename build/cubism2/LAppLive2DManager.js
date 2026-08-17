@@ -3,6 +3,7 @@ import LAppModel from './LAppModel.js';
 import PlatformManager from './PlatformManager.js';
 import LAppDefine from './LAppDefine.js';
 import logger from '../logger.js';
+import { canonicalArea, motionGroupsFor } from '../hitAreas.js';
 class LAppLive2DManager {
     constructor() {
         this.model = null;
@@ -24,6 +25,10 @@ class LAppLive2DManager {
             if (this.reloading)
                 return;
             this.reloading = true;
+            const pm = Live2DFramework.getPlatformManager();
+            if (pm && typeof pm.clearCache === 'function') {
+                pm.clearCache();
+            }
             const oldModel = this.model;
             const newModel = new LAppModel();
             newModel.load(gl, modelSettingPath, () => {
@@ -40,6 +45,10 @@ class LAppLive2DManager {
         if (this.reloading)
             return;
         this.reloading = true;
+        const pm = Live2DFramework.getPlatformManager();
+        if (pm && typeof pm.clearCache === 'function') {
+            pm.clearCache();
+        }
         const oldModel = this.model;
         const newModel = new LAppModel();
         await newModel.loadModelSetting(modelSettingPath, modelSetting);
@@ -57,13 +66,13 @@ class LAppLive2DManager {
     maxScaleEvent() {
         logger.trace('Max scale event.');
         if (this.model) {
-            this.model.startRandomMotion(LAppDefine.MOTION_GROUP_PINCH_IN, LAppDefine.PRIORITY_NORMAL);
+            this.model.startNextMotion(LAppDefine.MOTION_GROUP_PINCH_IN, LAppDefine.PRIORITY_NORMAL);
         }
     }
     minScaleEvent() {
         logger.trace('Min scale event.');
         if (this.model) {
-            this.model.startRandomMotion(LAppDefine.MOTION_GROUP_PINCH_OUT, LAppDefine.PRIORITY_NORMAL);
+            this.model.startNextMotion(LAppDefine.MOTION_GROUP_PINCH_OUT, LAppDefine.PRIORITY_NORMAL);
         }
     }
     startFirstAvailableMotion(names) {
@@ -73,7 +82,7 @@ class LAppLive2DManager {
         for (const name of names) {
             if (this.model.modelSetting.getMotionNum(name) <= 0)
                 continue;
-            this.model.startRandomMotion(name, LAppDefine.PRIORITY_NORMAL);
+            this.model.startNextMotion(name, LAppDefine.PRIORITY_NORMAL);
             return true;
         }
         return false;
@@ -81,28 +90,20 @@ class LAppLive2DManager {
     tapEvent(x, y) {
         logger.trace('tapEvent view x:' + x + ' y:' + y);
         if (!this.model)
-            return false;
-        if (this.model.hitTest(LAppDefine.HIT_AREA_HEAD, x, y)) {
-            logger.trace('Tap face.');
-            if (Object.keys(this.model.expressions).length > 0) {
-                this.model.setRandomExpression();
-            }
-            else {
-                this.startFirstAvailableMotion([
-                    LAppDefine.MOTION_GROUP_TAP_FACE,
-                    LAppDefine.MOTION_GROUP_FLICK_HEAD,
-                ]);
-            }
+            return null;
+        const area = this.model
+            .declaredHitAreas()
+            .find(name => this.model.hitTest(name, x, y));
+        if (!area)
+            return null;
+        logger.trace(`Tap ${area}.`);
+        const hasOwnLine = motionGroupsFor(area).some(name => this.model.modelSetting.getMotionNum(name) > 0 &&
+            this.model.modelSetting.hasMotionText(name));
+        if (canonicalArea(area) === 'head' && Object.keys(this.model.expressions).length > 0) {
+            this.model.setRandomExpression();
         }
-        else if (this.model.hitTest(LAppDefine.HIT_AREA_BODY, x, y)) {
-            logger.trace('Tap body.');
-            this.startFirstAvailableMotion([
-                LAppDefine.MOTION_GROUP_TAP_BODY,
-                LAppDefine.MOTION_GROUP_TAP_BREAST,
-                LAppDefine.MOTION_GROUP_TAP_BELLY,
-            ]);
-        }
-        return true;
+        const spoke = this.startFirstAvailableMotion(motionGroupsFor(area));
+        return { area, hasOwnLine, spoke };
     }
 }
 export default LAppLive2DManager;

@@ -5,6 +5,7 @@ import { ToolsManager } from './tools.js';
 import logger from './logger.js';
 import registerDrag from './drag.js';
 import { fa_child } from './icons.js';
+import * as debug from './debug.js';
 const WAIFU_DISABLED_KEY = 'waifu-disabled';
 function registerEventListener(tips) {
     let userAction = false;
@@ -65,6 +66,10 @@ function registerEventListener(tips) {
         const text = randomSelection(tips.message.hoverBody);
         showMessage(text, 4000, 8, false);
     });
+    window.addEventListener('live2d:showmessage', (e) => {
+        const { text, duration, priority } = e.detail;
+        showMessage(text, duration || 4000, priority || 12);
+    });
     window.addEventListener('live2d:tapbody', () => {
         const text = randomSelection(tips.message.tapBody);
         showMessage(text, 4000, 9);
@@ -114,6 +119,14 @@ async function loadWidget(config) {
     if (config.drag)
         registerDrag();
     (_a = document.getElementById('waifu')) === null || _a === void 0 ? void 0 : _a.classList.add('waifu-active');
+    window.live2dDebug = {
+        show: () => debug.show((x, y) => model.hitAreasAt(x, y)),
+        hide: () => debug.hide(),
+        measure: (area) => debug.measure(area),
+        model,
+    };
+    if (config.debug)
+        window.live2dDebug.show();
 }
 function initWidget(config) {
     if (typeof config === 'string') {

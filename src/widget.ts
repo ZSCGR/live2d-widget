@@ -10,6 +10,7 @@ import { ToolsManager } from './tools.js';
 import logger from './logger.js';
 import registerDrag from './drag.js';
 import { fa_child } from './icons.js';
+import * as debug from './debug.js';
 
 const WAIFU_DISABLED_KEY = 'waifu-disabled';
 
@@ -157,6 +158,10 @@ function registerEventListener(tips: Tips) {
     const text = randomSelection(tips.message.hoverBody);
     showMessage(text, 4000, 8, false);
   });
+  window.addEventListener('live2d:showmessage', (e: any) => {
+    const { text, duration, priority } = e.detail;
+    showMessage(text, duration || 4000, priority || 12);
+  });
   window.addEventListener('live2d:tapbody', () => {
     const text = randomSelection(tips.message.tapBody);
     showMessage(text, 4000, 9);
@@ -212,6 +217,15 @@ async function loadWidget(config: Config) {
   new ToolsManager(model, config, tips).registerTools();
   if (config.drag) registerDrag();
   document.getElementById('waifu')?.classList.add('waifu-active');
+
+  // Debug handle: live2dDebug.show() paints the hit areas over the canvas.
+  window.live2dDebug = {
+    show: () => debug.show((x, y) => model.hitAreasAt(x, y)),
+    hide: () => debug.hide(),
+    measure: (area?: string) => debug.measure(area),
+    model,
+  };
+  if (config.debug) window.live2dDebug.show();
 }
 
 /**

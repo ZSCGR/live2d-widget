@@ -23,16 +23,14 @@ class MatrixStack {
   }
 
   static push() {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const offset = this.depth * 16;
-    const nextOffset = (this.depth + 1) * 16;
 
-    if (this.matrixStack.length < nextOffset + 16) {
-      this.matrixStack.length = nextOffset + 16;
+    if (this.matrixStack.length < offset + 16) {
+      this.matrixStack.length = offset + 16;
     }
 
     for (let i = 0; i < 16; i++) {
-      this.matrixStack[nextOffset + i] = this.currentMatrix[i];
+      this.matrixStack[offset + i] = this.currentMatrix[i];
     }
 
     this.depth++;
@@ -51,7 +49,7 @@ class MatrixStack {
   }
 
   static getMatrix(): number[] {
-    return this.currentMatrix;
+    return this.currentMatrix.slice();
   }
 
   static multMatrix(matNew: number[]) {

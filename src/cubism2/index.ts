@@ -1,9 +1,26 @@
 /* global document, window, Event, Live2D */
+// Global audio tracker to ensure only one audio plays at a time
+let globalAudio: HTMLAudioElement | null = null;
+
+function stopGlobalAudio(): void {
+  if (globalAudio) {
+    globalAudio.pause();
+    globalAudio.currentTime = 0;
+    globalAudio = null;
+  }
+}
+
+function registerAudio(audio: HTMLAudioElement): void {
+  stopGlobalAudio();
+  globalAudio = audio;
+}
+
 import { L2DMatrix44, L2DTargetPoint, L2DViewMatrix } from './Live2DFramework.js';
 import LAppDefine from './LAppDefine.js';
 import MatrixStack from './utils/MatrixStack.js';
 import LAppLive2DManager from './LAppLive2DManager.js';
 import logger from '../logger.js';
+import { fallbackEventFor } from '../hitAreas.js';
 import type { Live2DModelSetting, Matrix44, TargetPoint, ViewMatrix } from './types.js';
 
 function normalizePoint(x: number, y: number, x0: number, y0: number, w: number, h: number) {
@@ -136,6 +153,8 @@ class Cubism2Model {
   }
 
   destroy() {
+    // 0. Stop any playing audio
+    stopGlobalAudio();
     // 1. Unbind canvas events
     if (this.canvas) {
       this.canvas.removeEventListener('mousewheel', this._boundMouseEvent, false);
@@ -156,7 +175,15 @@ class Cubism2Model {
     }
     this.isDrawStart = false;
 
-    // 3. Release Live2D related resources
+   // 3. Release Live2D related resources
+    // Stop any playing audio before releasing model
+    if (this.live2DMgr && this.live2DMgr.model) {
+      const model = this.live2DMgr.model as any;
+      if (model._currentAudio) {
+        model._currentAudio.pause();
+        model._currentAudio = null;
+      }
+    }
     const releasableManager = this.live2DMgr as LAppLive2DManager & { release?: () => void };
     if (typeof releasableManager.release === 'function') {
       releasableManager.release();
@@ -181,10 +208,20 @@ class Cubism2Model {
     if (!this.isDrawStart) {
       this.isDrawStart = true;
       const tick = () => {
+        if (!this.isDrawStart) return;
         this.draw();
+        if (!this.isDrawStart) return;
         this._drawFrameId = window.requestAnimationFrame(tick);
       };
       tick();
+    }
+  }
+
+  stopDraw() {
+    this.isDrawStart = false;
+    if (this._drawFrameId) {
+      window.cancelAnimationFrame(this._drawFrameId);
+      this._drawFrameId = null;
     }
   }
 
@@ -198,6 +235,7 @@ class Cubism2Model {
     this.dragMgr.update();
     this.live2DMgr.setDrag(this.dragMgr.getX(), this.dragMgr.getY());
 
+    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
 
     MatrixStack.multMatrix(this.projMatrix.getArray());
@@ -209,6 +247,7 @@ class Cubism2Model {
     if (model == null) return;
 
     if (model.initialized && !model.updating) {
+      Live2D.setGL(this.gl);
       model.update();
       model.draw(this.gl);
     }
@@ -254,7 +293,7 @@ class Cubism2Model {
    * pixels before deviceToScreen and the view matrix can map them onto the
    * model. The result matches what is actually rendered, zoom included.
    */
-  viewPoint(event: MouseEvent | Touch) {
+  viewPoint(event: { clientX: number; clientY: number }) {
     if (!this.canvas) return { x: 0, y: 0 };
     const rect = this.canvas.getBoundingClientRect();
     if (!rect.width || !rect.height) return { x: 0, y: 0 };
@@ -266,6 +305,31 @@ class Cubism2Model {
       x: this.transformViewX(deviceX),
       y: this.transformViewY(deviceY),
     };
+  }
+
+  /**
+   * Every hit area the model declares. Debug probe; the model owns the list
+   * so the overlay cannot drift from what hitTest actually searches.
+   */
+  declaredHitAreas(): string[] {
+    return this.live2DMgr.model?.declaredHitAreas() ?? [];
+  }
+
+  /**
+   * Which hit areas respond at a given viewport position. Debug probe: it
+   * asks the model the same question modelTurnHead does, so what it reports
+   * is exactly what a real click would trigger.
+   */
+  hitAreasAt(clientX: number, clientY: number) {
+    const { x, y } = this.viewPoint({ clientX, clientY });
+    const model = this.live2DMgr.model;
+    const areas: string[] = [];
+    if (model) {
+      for (const name of this.declaredHitAreas()) {
+        if (model.hitTest(name, x, y)) areas.push(name);
+      }
+    }
+    return { x, y, areas };
   }
 
   modelTurnHead(event: MouseEvent | Touch) {
@@ -295,14 +359,13 @@ class Cubism2Model {
     );
 
     this.dragMgr.setPoint(vx, vy);
-    this.live2DMgr.tapEvent(x, y);
 
-    // Head wins over body where the two areas overlap, matching the order
-    // tapEvent picks a motion in, so only one message is ever shown.
-    if (this.live2DMgr.model?.hitTest(LAppDefine.HIT_AREA_HEAD, x, y)) {
-      window.dispatchEvent(new Event('live2d:taphead'));
-    } else if (this.live2DMgr.model?.hitTest(LAppDefine.HIT_AREA_BODY, x, y)) {
-      window.dispatchEvent(new Event('live2d:tapbody'));
+    // tapEvent has already hit-tested and started whatever the model defines
+    // for the area. The generic line is only for areas the model has nothing
+    // to say about.
+    const hit = this.live2DMgr.tapEvent(x, y);
+    if (hit && !hit.hasOwnLine) {
+      window.dispatchEvent(new Event(fallbackEventFor(hit.area)));
     }
   }
 

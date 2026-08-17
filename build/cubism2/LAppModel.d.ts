@@ -40,11 +40,12 @@ declare class LAppModel extends L2DBaseModel {
     preloadMotionGroup(name: string): void;
     update(): void;
     setRandomExpression(): void;
-    startRandomMotion(name: string, priority: number): void;
+    startNextMotion(name: string, priority: number): void;
     startMotion(name: string, no: number, priority: number): void;
-    setFadeInFadeOut(name: string, no: number, priority: number, motion: Motion): void;
+    setFadeInFadeOut(name: string, no: number, priority: number, motion: Motion | null): void;
     setExpression(name: string): void;
     draw(gl: WebGL2RenderingContext): void;
+    declaredHitAreas(): string[];
     hitTest(id: string, testX: number, testY: number): boolean;
 }
 export default LAppModel;

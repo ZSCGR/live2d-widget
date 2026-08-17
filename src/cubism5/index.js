@@ -6,6 +6,7 @@ import * as LAppDefine from '@demo/lappdefine.js';
 import { LAppModel } from '@demo/lappmodel.js';
 import { LAppPal } from '@demo/lapppal';
 import logger from '../logger.js';
+import { fallbackEventFor, motionGroupsFor } from '../hitAreas.js';
 
 LAppPal.printMessage = () => {};
 
@@ -128,20 +129,41 @@ class AppSubdelegate extends LAppSubdelegate {
 
 // Main application delegate class, responsible for managing the main loop, canvas, model switching, and other global logic
 export class AppDelegate extends LAppDelegate {
+  // Global audio tracker to ensure only one audio plays at a time
+  static _globalAudio = null;
+
+  static stopGlobalAudio() {
+    if (AppDelegate._globalAudio) {
+      AppDelegate._globalAudio.pause();
+      AppDelegate._globalAudio.currentTime = 0;
+      AppDelegate._globalAudio = null;
+    }
+  }
+
+  static registerAudio(audio) {
+    AppDelegate.stopGlobalAudio();
+    AppDelegate._globalAudio = audio;
+  }
   /**
    * Start the main loop.
    */
   run() {
+    if (this._isRunning) return;
+    this._isRunning = true;
     // Main loop function, responsible for updating time and all subdelegates
     const loop = () => {
+      if (!this._isRunning) return;
       // Update time
       LAppPal.updateTime();
 
       // Iterate all subdelegates and call update for rendering
-      for (let i = 0; i < this._subdelegates.getSize(); i++) {
-        this._subdelegates.at(i).update();
+      if (this._subdelegates) {
+        for (let i = 0; i < this._subdelegates.getSize(); i++) {
+          this._subdelegates.at(i).update();
+        }
       }
 
+      if (!this._isRunning) return;
       // Recursive call for animation loop
       this._drawFrameId = window.requestAnimationFrame(loop);
     };
@@ -149,19 +171,36 @@ export class AppDelegate extends LAppDelegate {
   }
 
   stop() {
+    this._isRunning = false;
     if (this._drawFrameId) {
       window.cancelAnimationFrame(this._drawFrameId);
       this._drawFrameId = null;
     }
   }
 
-  release() {
+ release() {
+   // Stop global audio
+    AppDelegate.stopGlobalAudio();
     this.stop();
-    this.releaseEventListener();
-    this._subdelegates.clear();
+   this.releaseEventListener();
+    // Stop any playing audio from all models before clearing
+    for (let i = 0; i < this._subdelegates.getSize(); i++) {
+      const subdelegate = this._subdelegates.at(i);
+      const live2dManager = subdelegate.getLive2DManager();
+      if (live2dManager) {
+        for (let j = 0; j < live2dManager._models.getSize(); j++) {
+          const model = live2dManager._models.at(j);
+          if (model && model._currentAudio) {
+            model._currentAudio.pause();
+            model._currentAudio = null;
+          }
+        }
+      }
+    }
+   this._subdelegates.clear();
 
-    this._cubismOption = null;
-  }
+   this._cubismOption = null;
+ }
 
   transformOffset(e) {
     const subdelegate = this._subdelegates.at(0);
@@ -185,13 +224,75 @@ export class AppDelegate extends LAppDelegate {
     };
   }
 
+  /**
+   * Which hit areas respond at a given viewport position. Debug probe: it
+   * asks the model the same question onTap does, so what it reports is
+   * exactly what a real click would trigger.
+   */
+  hitAreasAt(clientX, clientY) {
+    const { x, y } = this.transformOffset({ clientX, clientY });
+    const model = this._subdelegates.at(0)?.getLive2DManager()?._models.at(0);
+    const areas = [];
+    if (model && model._model) {
+      const setting = model._modelSetting;
+      const custom = setting ? setting.getHitAreaCustom() : null;
+      if (custom) {
+        for (const key of Object.keys(custom)) {
+          if (!key.endsWith('_x')) continue;
+          const name = key.slice(0, -2);
+          if (!areas.includes(name) && model.hitTest(name, x, y)) {
+            areas.push(name);
+          }
+        }
+      }
+      const count = setting ? setting.getHitAreasCount() : 0;
+      for (let i = 0; i < count; i++) {
+        const name = setting.getHitAreaName(i);
+        if (name && !areas.includes(name) && model.hitTest(name, x, y)) {
+          areas.push(name);
+        }
+      }
+    }
+    return { x, y, areas };
+  }
+
+  /**
+   * Check if a motion group has text (Cubism 5 equivalent of hasMotionText).
+   * This checks if any motion in the group has a non-empty Text field.
+   */
+  hasMotionText(model, groupName) {
+    const count = model._modelSetting.getMotionCount(groupName);
+    if (count <= 0) return false;
+    
+    const rootNode = model._modelSetting.getJson?.()?.getRoot?.();
+    if (!rootNode) return false;
+    
+    const motionsNode = rootNode.getValueByString('FileReferences')?.getValueByString('Motions');
+    if (!motionsNode || motionsNode.isNull() || motionsNode.isError()) return false;
+    
+    const groupNode = motionsNode.getValueByString(groupName);
+    if (!groupNode || groupNode.isNull() || groupNode.isError()) return false;
+    
+    for (let i = 0; i < groupNode.getSize(); i++) {
+      const item = groupNode.getValueByIndex(i);
+      const textNode = item.getValueByString('Text');
+      if (textNode && !textNode.isNull() && !textNode.isError()) {
+        const text = textNode.getRawString();
+        if (text && text.trim() && !/^\d+$/.test(text.trim())) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   onMouseMove(e) {
     const lapplive2dmanager = this._subdelegates.at(0).getLive2DManager();
     const { x, y } = this.transformOffset(e);
     const model = lapplive2dmanager._models.at(0);
+    if (!model || !model._model) return;
 
     lapplive2dmanager.onDrag(x, y);
-    lapplive2dmanager.onTap(x, y);
     if (model.hitTest(LAppDefine.HitAreaNameBody, x, y)) {
       window.dispatchEvent(new Event('live2d:hoverbody'));
     }
@@ -199,24 +300,76 @@ export class AppDelegate extends LAppDelegate {
 
   onMouseEnd(e) {
     const lapplive2dmanager = this._subdelegates.at(0).getLive2DManager();
-    const { x, y } = this.transformOffset(e);
+    const model = lapplive2dmanager._models.at(0);
+    if (!model || !model._model || !model._modelSetting) return;
+
     lapplive2dmanager.onDrag(0.0, 0.0);
-    lapplive2dmanager.onTap(x, y);
   }
 
   onTap(e) {
     const lapplive2dmanager = this._subdelegates.at(0).getLive2DManager();
     const { x, y } = this.transformOffset(e);
     const model = lapplive2dmanager._models.at(0);
+    if (!model || !model._model || !model._modelSetting) return;
 
-    // Head wins over body where the two areas overlap, so only one message
-    // is ever shown.
-    if (model.hitTest(LAppDefine.HitAreaNameHead, x, y)) {
-      window.dispatchEvent(new Event('live2d:taphead'));
-    } else if (model.hitTest(LAppDefine.HitAreaNameBody, x, y)) {
-      window.dispatchEvent(new Event('live2d:tapbody'));
+    // Find which area was hit
+    let hitArea = null;
+    let hitHasOwnLine = false;
+    
+    // Check custom hit areas first
+    const hitAreasCustom = model._modelSetting.getHitAreaCustom();
+    if (hitAreasCustom) {
+      for (const key of Object.keys(hitAreasCustom)) {
+        if (!key.endsWith('_x')) continue;
+        const customName = key.slice(0, -2);
+        if (model.hitTest(customName, x, y)) {
+          hitArea = customName;
+          // Check if this area has its own lines
+          const motionGroups = motionGroupsFor(customName);
+          for (const groupName of motionGroups) {
+            if (model._modelSetting.getMotionCount(groupName) > 0 &&
+                this.hasMotionText(model, groupName)) {
+              hitHasOwnLine = true;
+              break;
+            }
+          }
+          break;
+        }
+      }
+    }
+    
+    // Check native hit areas
+    if (!hitArea) {
+      const count = model._modelSetting.getHitAreasCount();
+      for (let i = 0; i < count; i++) {
+        const areaName = model._modelSetting.getHitAreaName(i);
+        if (areaName && model.hitTest(areaName, x, y)) {
+          hitArea = areaName;
+          // Check if this area has its own lines
+          const motionGroups = motionGroupsFor(areaName);
+          for (const groupName of motionGroups) {
+            if (model._modelSetting.getMotionCount(groupName) > 0 &&
+                this.hasMotionText(model, groupName)) {
+              hitHasOwnLine = true;
+              break;
+            }
+          }
+          break;
+        }
+      }
+    }
+    
+    if (!hitArea) return;
+
+    // The SDK manager plays whatever the model defines for the area it hits.
+    const handled = lapplive2dmanager.onTap(x, y);
+    
+    // Only fall back to generic line if this area has no own lines
+    if (!hitHasOwnLine) {
+      window.dispatchEvent(new Event(fallbackEventFor(hitArea)));
     }
   }
+
 
   initializeEventListener() {
     this.mouseMoveEventListener = this.onMouseMove.bind(this);
@@ -252,12 +405,22 @@ export class AppDelegate extends LAppDelegate {
    * Create canvas and initialize all Subdelegates
    */
   initializeSubdelegates() {
+    if (!this._canvases) {
+      this._canvases = new csmVector();
+    }
+    if (!this._subdelegates) {
+      this._subdelegates = new csmVector();
+    }
+    this._canvases.clear();
+    this._subdelegates.clear();
+
     // Reserve space to improve performance
     this._canvases.prepareCapacity(LAppDefine.CanvasNum);
     this._subdelegates.prepareCapacity(LAppDefine.CanvasNum);
 
     // Get the live2d canvas element from the page
     const canvas = document.getElementById('live2d');
+    if (!canvas) return;
     this._canvases.pushBack(canvas);
 
     // Set canvas style size to match actual size
@@ -296,6 +459,8 @@ export class AppDelegate extends LAppDelegate {
     // Get the current Live2D manager
     const live2dManager = this._subdelegates.at(0).getLive2DManager();
     // Release all old models
+    // Stop any playing audio before switching models
+    AppDelegate.stopGlobalAudio();
     live2dManager.releaseAllModel();
     // Create a new model instance, set subdelegate and load resources
     const instance = new LAppModel();

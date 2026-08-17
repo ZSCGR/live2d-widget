@@ -38,6 +38,8 @@ declare class ModelSettingJson {
     getMotionNum(name: string): number;
     getMotionFile(name: string, n: number): string | null;
     getMotionSound(name: string, n: number): string | null;
+    getMotionText(name: string, n: number): string | null;
+    hasMotionText(name: string): boolean;
     getMotionFadeIn(name: string, n: number): number;
     getMotionFadeOut(name: string, n: number): number;
     getInitParamID(n: number): string | null;

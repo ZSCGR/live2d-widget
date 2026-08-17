@@ -1,8 +1,21 @@
+let globalAudio = null;
+function stopGlobalAudio() {
+    if (globalAudio) {
+        globalAudio.pause();
+        globalAudio.currentTime = 0;
+        globalAudio = null;
+    }
+}
+function registerAudio(audio) {
+    stopGlobalAudio();
+    globalAudio = audio;
+}
 import { L2DMatrix44, L2DTargetPoint, L2DViewMatrix } from './Live2DFramework.js';
 import LAppDefine from './LAppDefine.js';
 import MatrixStack from './utils/MatrixStack.js';
 import LAppLive2DManager from './LAppLive2DManager.js';
 import logger from '../logger.js';
+import { fallbackEventFor } from '../hitAreas.js';
 function normalizePoint(x, y, x0, y0, w, h) {
     const dx = x - x0;
     const dy = y - y0;
@@ -89,6 +102,7 @@ class Cubism2Model {
         this.startDraw();
     }
     destroy() {
+        stopGlobalAudio();
         if (this.canvas) {
             this.canvas.removeEventListener('mousewheel', this._boundMouseEvent, false);
             this.canvas.removeEventListener('click', this._boundMouseEvent, false);
@@ -104,6 +118,13 @@ class Cubism2Model {
             this._drawFrameId = null;
         }
         this.isDrawStart = false;
+        if (this.live2DMgr && this.live2DMgr.model) {
+            const model = this.live2DMgr.model;
+            if (model._currentAudio) {
+                model._currentAudio.pause();
+                model._currentAudio = null;
+            }
+        }
         const releasableManager = this.live2DMgr;
         if (typeof releasableManager.release === 'function') {
             releasableManager.release();
@@ -121,10 +142,21 @@ class Cubism2Model {
         if (!this.isDrawStart) {
             this.isDrawStart = true;
             const tick = () => {
+                if (!this.isDrawStart)
+                    return;
                 this.draw();
+                if (!this.isDrawStart)
+                    return;
                 this._drawFrameId = window.requestAnimationFrame(tick);
             };
             tick();
+        }
+    }
+    stopDraw() {
+        this.isDrawStart = false;
+        if (this._drawFrameId) {
+            window.cancelAnimationFrame(this._drawFrameId);
+            this._drawFrameId = null;
         }
     }
     draw() {
@@ -134,6 +166,7 @@ class Cubism2Model {
         MatrixStack.loadIdentity();
         this.dragMgr.update();
         this.live2DMgr.setDrag(this.dragMgr.getX(), this.dragMgr.getY());
+        this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT);
         MatrixStack.multMatrix(this.projMatrix.getArray());
         MatrixStack.multMatrix(this.viewMatrix.getArray());
@@ -142,6 +175,7 @@ class Cubism2Model {
         if (model == null)
             return;
         if (model.initialized && !model.updating) {
+            Live2D.setGL(this.gl);
             model.update();
             model.draw(this.gl);
         }
@@ -187,8 +221,23 @@ class Cubism2Model {
             y: this.transformViewY(deviceY),
         };
     }
-    modelTurnHead(event) {
+    declaredHitAreas() {
         var _a, _b;
+        return (_b = (_a = this.live2DMgr.model) === null || _a === void 0 ? void 0 : _a.declaredHitAreas()) !== null && _b !== void 0 ? _b : [];
+    }
+    hitAreasAt(clientX, clientY) {
+        const { x, y } = this.viewPoint({ clientX, clientY });
+        const model = this.live2DMgr.model;
+        const areas = [];
+        if (model) {
+            for (const name of this.declaredHitAreas()) {
+                if (model.hitTest(name, x, y))
+                    areas.push(name);
+            }
+        }
+        return { x, y, areas };
+    }
+    modelTurnHead(event) {
         if (!this.canvas || !this.dragMgr)
             return;
         const rect = this.canvas.getBoundingClientRect();
@@ -208,12 +257,9 @@ class Cubism2Model {
             y +
             ')');
         this.dragMgr.setPoint(vx, vy);
-        this.live2DMgr.tapEvent(x, y);
-        if ((_a = this.live2DMgr.model) === null || _a === void 0 ? void 0 : _a.hitTest(LAppDefine.HIT_AREA_HEAD, x, y)) {
-            window.dispatchEvent(new Event('live2d:taphead'));
-        }
-        else if ((_b = this.live2DMgr.model) === null || _b === void 0 ? void 0 : _b.hitTest(LAppDefine.HIT_AREA_BODY, x, y)) {
-            window.dispatchEvent(new Event('live2d:tapbody'));
+        const hit = this.live2DMgr.tapEvent(x, y);
+        if (hit && !hit.hasOwnLine) {
+            window.dispatchEvent(new Event(fallbackEventFor(hit.area)));
         }
     }
     followPointer(event) {

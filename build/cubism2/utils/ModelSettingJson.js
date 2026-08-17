@@ -48,7 +48,8 @@ class ModelSettingJson {
         return this.json[this.HIT_AREAS].length;
     }
     getHitAreaCustom() {
-        return this.json[this.HIT_AREAS_CUSTOM];
+        var _a;
+        return (_a = this.json[this.HIT_AREAS_CUSTOM]) !== null && _a !== void 0 ? _a : null;
     }
     getHitAreaID(n) {
         if (this.json[this.HIT_AREAS] == null ||
@@ -111,6 +112,25 @@ class ModelSettingJson {
             this.json[this.MOTION_GROUPS][name][n][this.SOUND] == null)
             return null;
         return this.json[this.MOTION_GROUPS][name][n][this.SOUND];
+    }
+    getMotionText(name, n) {
+        if (this.json[this.MOTION_GROUPS] == null ||
+            this.json[this.MOTION_GROUPS][name] == null ||
+            this.json[this.MOTION_GROUPS][name][n] == null)
+            return null;
+        const item = this.json[this.MOTION_GROUPS][name][n];
+        const text = item.text || item.Text;
+        if (!text || typeof text !== 'string' || !text.trim() || /^\d+$/.test(text.trim())) {
+            return null;
+        }
+        return text.trim();
+    }
+    hasMotionText(name) {
+        var _a;
+        const group = (_a = this.json[this.MOTION_GROUPS]) === null || _a === void 0 ? void 0 : _a[name];
+        if (!Array.isArray(group))
+            return false;
+        return group.some((_, i) => this.getMotionText(name, i));
     }
     getMotionFadeIn(name, n) {
         if (this.json[this.MOTION_GROUPS] == null ||

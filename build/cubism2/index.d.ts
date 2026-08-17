@@ -18,13 +18,23 @@ declare class Cubism2Model {
     init(canvasId: string, modelSettingPath: string, modelSetting: Live2DModelSetting): Promise<void>;
     destroy(): void;
     startDraw(): void;
+    stopDraw(): void;
     draw(): void;
     changeModel(modelSettingPath: string): Promise<void>;
     changeModelWithJSON(modelSettingPath: string, modelSetting: Live2DModelSetting): Promise<void>;
     modelScaling(scale: number): void;
-    viewPoint(event: MouseEvent | Touch): {
+    viewPoint(event: {
+        clientX: number;
+        clientY: number;
+    }): {
         x: number;
         y: number;
+    };
+    declaredHitAreas(): string[];
+    hitAreasAt(clientX: number, clientY: number): {
+        x: number;
+        y: number;
+        areas: string[];
     };
     modelTurnHead(event: MouseEvent | Touch): void;
     followPointer(event: MouseEvent | Touch): void;

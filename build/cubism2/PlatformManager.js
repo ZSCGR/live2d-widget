@@ -2,21 +2,48 @@ import logger from '../logger.js';
 class PlatformManager {
     constructor() {
         this.cache = {};
+        this.generation = 0;
+    }
+    clearCache() {
+        for (const key of Object.keys(this.cache)) {
+            delete this.cache[key];
+        }
+        this.generation++;
     }
     loadBytes(path, callback) {
+        const cacheBuster = `?_cb=${Date.now()}`;
+        const fetchPath = path.includes('?') ? `${path}&_cb=${Date.now()}` : `${path}?_cb=${Date.now()}`;
         if (path in this.cache) {
             return callback(this.cache[path]);
         }
-        fetch(path)
-            .then(response => response.arrayBuffer())
+        const requestGeneration = this.generation;
+        fetch(fetchPath)
+            .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.arrayBuffer();
+        })
             .then(arrayBuffer => {
+            if (requestGeneration !== this.generation) {
+                callback(null);
+                return;
+            }
             this.cache[path] = arrayBuffer;
             callback(arrayBuffer);
+        })
+            .catch(error => {
+            logger.error('Failed to load:', path, error);
+            callback(null);
         });
     }
     loadLive2DModel(path, callback) {
         let model = null;
         this.loadBytes(path, buf => {
+            if (!buf) {
+                logger.error('Failed to load model data:', path);
+                return;
+            }
             model = Live2DModelWebGL.loadModel(buf);
             callback(model);
         });
@@ -36,6 +63,7 @@ class PlatformManager {
                 logger.error('Failed to create WebGL context.');
                 return -1;
             }
+            Live2D.setGL(gl);
             const texture = gl.createTexture();
             if (!texture) {
                 logger.error('Failed to generate gl texture name.');
@@ -53,10 +81,12 @@ class PlatformManager {
             gl.generateMipmap(gl.TEXTURE_2D);
             model.setTexture(no, texture);
             if (typeof callback == 'function')
-                callback();
+                callback(texture);
         };
         loadedImage.onerror = () => {
             logger.error('Failed to load image : ' + path);
+            if (typeof callback == 'function')
+                callback(null);
         };
     }
     jsonParseFromBytes(buf) {

@@ -18,4 +18,9 @@ interface Window {
    * @type {(config: Config) => void}
    */
   initWidget: (config: Config) => void;
+  /**
+   * Hit area debug overlay handle.
+   * @type {any}
+   */
+  live2dDebug: any;
 }

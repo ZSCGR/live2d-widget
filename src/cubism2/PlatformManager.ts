@@ -16,23 +16,61 @@ import type { Live2DModelRuntime } from './types.js';
 //============================================================
 class PlatformManager {
   private readonly cache: Record<string, ArrayBuffer>;
+  private generation: number;
   public texture?: WebGLTexture;
 
-  constructor() {
-    this.cache = {};
+ constructor() {
+   this.cache = {};
+   this.generation = 0;
+ }
+
+ /**
+  * Clear the cache to prevent loading old model data when switching models.
+  * This is necessary because motion files may have the same relative paths
+  * across different models, and we don't want to use cached data from
+  * previous models.
+  * Also increments generation to ignore in-flight requests from previous models.
+  */
+  clearCache(): void {
+    for (const key of Object.keys(this.cache)) {
+      delete this.cache[key];
+    }
+    this.generation++;
   }
+
   //============================================================
   //    PlatformManager # loadBytes()
   //============================================================
-  loadBytes(path: string, callback: (buf: ArrayBuffer) => void) {
+  loadBytes(path: string, callback: (buf: ArrayBuffer | null) => void): void {
+    // Add cache buster to prevent browser HTTP cache from returning old model data
+    const cacheBuster = `?_cb=${Date.now()}`;
+    const fetchPath = path.includes('?') ? `${path}&_cb=${Date.now()}` : `${path}?_cb=${Date.now()}`;
+    
+    // Check app-level cache (without cache buster)
     if (path in this.cache) {
       return callback(this.cache[path]);
     }
-    fetch(path)
-      .then(response => response.arrayBuffer())
+    const requestGeneration = this.generation;
+    fetch(fetchPath)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        return response.arrayBuffer();
+      })
       .then(arrayBuffer => {
+        // If generation changed, this is a stale response from a previous model
+        // Don't cache it, but still callback so the caller doesn't hang
+        if (requestGeneration !== this.generation) {
+          callback(null);
+          return;
+        }
         this.cache[path] = arrayBuffer;
         callback(arrayBuffer);
+      })
+      .catch(error => {
+        logger.error('Failed to load:', path, error);
+        callback(null);
       });
   }
 
@@ -44,6 +82,10 @@ class PlatformManager {
 
     // load moc
     this.loadBytes(path, buf => {
+      if (!buf) {
+        logger.error('Failed to load model data:', path);
+        return;
+      }
       model = Live2DModelWebGL.loadModel(buf) as unknown as Live2DModelRuntime;
       callback(model);
     });
@@ -52,7 +94,12 @@ class PlatformManager {
   //============================================================
   //    PlatformManager # loadTexture()
   //============================================================
-  loadTexture(model: Live2DModelRuntime, no: number, path: string, callback?: () => void) {
+  loadTexture(
+    model: Live2DModelRuntime,
+    no: number,
+    path: string,
+    callback?: (tex: WebGLTexture | null) => void,
+  ) {
     // load textures
     const loadedImage = new Image();
     loadedImage.crossOrigin = 'anonymous';
@@ -70,6 +117,7 @@ class PlatformManager {
         logger.error('Failed to create WebGL context.');
         return -1;
       }
+      (Live2D as any).setGL(gl);
       const texture = gl.createTexture();
       if (!texture) {
         logger.error('Failed to generate gl texture name.');
@@ -101,11 +149,12 @@ class PlatformManager {
 
       model.setTexture(no, texture);
 
-      if (typeof callback == 'function') callback();
+      if (typeof callback == 'function') callback(texture);
     };
 
     loadedImage.onerror = () => {
       logger.error('Failed to load image : ' + path);
+      if (typeof callback == 'function') callback(null);
     };
   }
 

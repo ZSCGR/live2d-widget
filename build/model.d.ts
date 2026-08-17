@@ -1,4 +1,6 @@
 import { LogLevel } from './logger.js';
+export declare function stopGlobalAudio(): void;
+export declare function registerGlobalAudio(audio: HTMLAudioElement): void;
 interface ModelList {
     name: string;
     paths: string[];
@@ -15,6 +17,7 @@ interface Config {
     drag?: boolean;
     showToggleAfterQuit?: boolean;
     logLevel?: LogLevel;
+    debug?: boolean;
 }
 declare class ModelManager {
     readonly useCDN: boolean;
@@ -30,6 +33,7 @@ declare class ModelManager {
     private loading;
     private modelJSONCache;
     private models;
+    currentModelSetting: any;
     private constructor();
     static initCheck(config: Config, models?: ModelList[]): Promise<ModelManager>;
     set modelId(modelId: number);
@@ -39,10 +43,12 @@ declare class ModelManager {
     resetCanvas(): void;
     fetchWithCache(url: string): Promise<any>;
     checkModelVersion(modelSetting: any): 2 | 3;
+    hitAreasAt(clientX: number, clientY: number): any;
     loadLive2D(modelSettingPath: string, modelSetting: object): Promise<void>;
     loadTextureCache(modelName: string): Promise<any[]>;
-    loadModel(message: string | string[]): Promise<void>;
+    loadModel(message?: string | string[]): Promise<void>;
     loadRandTexture(successMessage?: string | string[], failMessage?: string | string[]): Promise<void>;
     loadNextModel(): Promise<void>;
+    loadPrevModel(): Promise<void>;
 }
 export { ModelManager, Config, ModelList };

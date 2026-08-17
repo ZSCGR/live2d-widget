@@ -23,6 +23,7 @@ class L2DBaseModel {
         this.motions = {};
         this.expressions = {};
         this.isTexLoaded = false;
+        this.textures = [];
     }
     getModelMatrix() {
         return this.modelMatrix;
@@ -91,33 +92,44 @@ class L2DBaseModel {
         });
     }
     loadTexture(no, path, callback) {
-        texCounter++;
         const pm = Live2DFramework.getPlatformManager();
         logger.info('Load Texture : ' + path);
-        pm.loadTexture(this.live2DModel, no, path, () => {
-            texCounter--;
-            if (texCounter == 0)
-                this.isTexLoaded = true;
+        pm.loadTexture(this.live2DModel, no, path, (tex) => {
+            if (tex) {
+                this.textures.push(tex);
+            }
             if (typeof callback == 'function')
-                callback();
+                callback(tex);
         });
     }
     loadMotion(name, path, callback) {
         const pm = Live2DFramework.getPlatformManager();
         logger.trace('Load Motion : ' + path);
-        let motion = null;
         pm.loadBytes(path, (buf) => {
-            motion = Live2DMotion.loadMotion(buf);
+            if (!buf) {
+                logger.warn('Motion load failed (no data): ' + path);
+                if (typeof callback == 'function')
+                    callback(null);
+                return;
+            }
+            const motion = Live2DMotion.loadMotion(buf);
             if (name != null) {
                 this.motions[name] = motion;
             }
-            callback(motion);
+            if (typeof callback == 'function')
+                callback(motion);
         });
     }
     loadExpression(name, path, callback) {
         const pm = Live2DFramework.getPlatformManager();
         logger.trace('Load Expression : ' + path);
         pm.loadBytes(path, (buf) => {
+            if (!buf) {
+                logger.warn('Expression load skipped (stale): ' + path);
+                if (typeof callback == 'function')
+                    callback();
+                return;
+            }
             if (name != null) {
                 this.expressions[name] = L2DExpressionMotion.loadJson(buf);
             }
@@ -152,32 +164,42 @@ class L2DBaseModel {
         }
     }
     hitTestSimple(drawID, testX, testY) {
+        if (!this.live2DModel)
+            return false;
         const drawIndex = this.live2DModel.getDrawDataIndex(drawID);
         if (drawIndex < 0)
             return false;
-        const points = this.live2DModel.getTransformedPoints(drawIndex);
-        let left = this.live2DModel.getCanvasWidth();
-        let right = 0;
-        let top = this.live2DModel.getCanvasHeight();
-        let bottom = 0;
-        for (let j = 0; j < points.length; j = j + 2) {
-            const x = points[j];
-            const y = points[j + 1];
-            if (x < left)
-                left = x;
-            if (x > right)
-                right = x;
-            if (y < top)
-                top = y;
-            if (y > bottom)
-                bottom = y;
+        const now = UtSystem.getUserTimeMSec();
+        this._hitBBoxCache = this._hitBBoxCache || {};
+        let bbox = this._hitBBoxCache[drawIndex];
+        if (!bbox || bbox.time !== now) {
+            const points = this.live2DModel.getTransformedPoints(drawIndex);
+            if (!points || points.length === 0)
+                return false;
+            let left = this.live2DModel.getCanvasWidth();
+            let right = 0;
+            let top = this.live2DModel.getCanvasHeight();
+            let bottom = 0;
+            for (let j = 0; j < points.length; j = j + 2) {
+                const x = points[j];
+                const y = points[j + 1];
+                if (x < left)
+                    left = x;
+                if (x > right)
+                    right = x;
+                if (y < top)
+                    top = y;
+                if (y > bottom)
+                    bottom = y;
+            }
+            bbox = { left, right, top, bottom, time: now };
+            this._hitBBoxCache[drawIndex] = bbox;
         }
         const tx = this.modelMatrix.invertTransformX(testX);
         const ty = this.modelMatrix.invertTransformY(testY);
-        return left <= tx && tx <= right && top <= ty && ty <= bottom;
+        return bbox.left <= tx && tx <= bbox.right && bbox.top <= ty && ty <= bbox.bottom;
     }
 }
-let texCounter = 0;
 class L2DExpressionMotion extends AMotion {
     constructor() {
         super();

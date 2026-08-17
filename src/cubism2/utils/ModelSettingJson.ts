@@ -78,7 +78,7 @@ class ModelSettingJson {
   }
 
   getHitAreaCustom(): HitAreasCustom | null {
-    return this.json[this.HIT_AREAS_CUSTOM];
+    return this.json[this.HIT_AREAS_CUSTOM] ?? null;
   }
 
   getHitAreaID(n: number): string | null {
@@ -166,6 +166,29 @@ class ModelSettingJson {
       return null;
 
     return this.json[this.MOTION_GROUPS][name][n][this.SOUND];
+  }
+
+  getMotionText(name: string, n: number): string | null {
+    if (
+      this.json[this.MOTION_GROUPS] == null ||
+      this.json[this.MOTION_GROUPS][name] == null ||
+      this.json[this.MOTION_GROUPS][name][n] == null
+    )
+      return null;
+
+    const item = this.json[this.MOTION_GROUPS][name][n];
+    const text = item.text || item.Text;
+    if (!text || typeof text !== 'string' || !text.trim() || /^\d+$/.test(text.trim())) {
+      return null;
+    }
+    return text.trim();
+  }
+
+  /** Whether any motion in the group carries a line of the model's own. */
+  hasMotionText(name: string): boolean {
+    const group = this.json[this.MOTION_GROUPS]?.[name];
+    if (!Array.isArray(group)) return false;
+    return group.some((_: unknown, i: number) => this.getMotionText(name, i));
   }
 
   getMotionFadeIn(name: string, n: number): number {
