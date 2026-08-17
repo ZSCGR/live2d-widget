@@ -3,11 +3,12 @@
  * https://github.com/stevenjoezhang/live2d-widget
  */
 
-// Recommended to use absolute path for live2d_path parameter
-// live2d_path 参数建议使用绝对路径
-const live2d_path = 'https://fastly.jsdelivr.net/gh/ZSCGR/live2d-widget@v0.0.10/dist/';
-// const live2d_path = 'https://fastly.jsdelivr.net/npm/live2d-widgets@1.0.1/dist/';
-// const live2d_path = '/dist/';
+// Recommended to use absolute path for live2d_path parameter, or auto-detect from script src
+// live2d_path 参数建议使用绝对路径，或根据当前 script src 自动识别
+const live2d_path =
+  (typeof document !== 'undefined' && document.currentScript && document.currentScript.src)
+    ? document.currentScript.src.replace(/autoload\.js(\?.*)?$/, '')
+    : '/dist/';
 
 // Method to encapsulate asynchronous resource loading
 // 封装异步加载资源的方法
